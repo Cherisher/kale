@@ -1,0 +1,3 @@
+[submodule "kl"]
+	path = kl
+	url = git://github.com/bzEq/kl.git
