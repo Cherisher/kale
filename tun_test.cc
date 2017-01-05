@@ -45,6 +45,8 @@ TEST(T, LoopTun) {
     KL_DEBUG("tun thread starts to work");
     kl::env::Defer defer([] { KL_DEBUG("tun thread exiting"); });
     defer([tun_fd] { ::close(tun_fd); });
+    // CAUTION: due to loopback link, i.e. 127.0.0.1, ip packets actually won't
+    // go via the tun
     tun_wait.Wait();
   });
   // prepare listen
