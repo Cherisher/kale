@@ -54,7 +54,10 @@ TEST(T, LoopTun) {
   std::thread([&message, &tun_wait, listen_fd] {
     KL_DEBUG("listen thread starts to work");
     kl::env::Defer defer([] { KL_DEBUG("listen thread exiting"); });
-    defer([listen_fd] { ::close(listen_fd); });
+    defer([listen_fd] {
+      ::close(listen_fd);
+      KL_DEBUG("listen closed");
+    });
     struct sockaddr_in addr;
     socklen_t len;
     int conn_fd =
@@ -76,13 +79,16 @@ TEST(T, LoopTun) {
     auto connect = kl::tcp::BlockingConnect(host, port);
     ASSERT(connect);
     int fd = *connect;
-    defer([fd] { ::close(fd); });
+    defer([fd] {
+      ::close(fd);
+      KL_DEBUG("connection closed");
+    });
     int nwrite = ::write(fd, &message[0], message.size());
     ASSERT(nwrite == message.size());
     tun_wait.Done();
   }).detach();
   tun_thread.join();
-  // std::this_thread::sleep_for(std::chrono::duration<float>(100));
+  // std::this_thread::sleep_for(std::chrono::duration<float>(10));
 }
 
 int main() { return KL_TEST(); }
