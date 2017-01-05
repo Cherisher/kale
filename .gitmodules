@@ -1,3 +1,6 @@
 [submodule "kl"]
 	path = kl
 	url = git://github.com/bzEq/kl.git
+[submodule "snappy"]
+	path = snappy
+	url = git://github.com/google/snappy.git
