@@ -28,7 +28,7 @@ kl::Result<std::tuple<int, std::string>> AllocateTun(const char *ifname) {
   ::memset(&ifr, 0, sizeof(ifr));
   ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
   if (ifname) {
-    strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
+    ::strncpy(ifr.ifr_name, ifname, IFNAMSIZ - 1);
   }
   int err = ::ioctl(fd, TUNSETIFF, static_cast<void *>(&ifr));
   if (err < 0) {
