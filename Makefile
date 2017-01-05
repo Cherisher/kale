@@ -6,7 +6,7 @@ SNAPPY := snappy
 SNAPPY_LIB := libsnappy.a
 CXX := clang++
 CXXFLAGS := -Wall -g -std=c++14 -O2
-LDFLAGS := -L. -lkale -lsnappy -L$(KL) -lkl
+LDFLAGS := -lpthread -L. -lkale -lsnappy -L$(KL) -lkl
 STATICLIB := libkale.a
 OBJECTS := tun.o
 TESTS := $(patsubst %.cc, %, $(wildcard *_test.cc))
