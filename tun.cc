@@ -4,13 +4,13 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include <linux/if.h>
 #include <linux/if_tun.h>
 
 #include <cerrno>
 #include <cstring>
 #include <cstring>
 
+#include "kl/netdev.h"
 #include "kl/random.h"
 #include "tun.h"
 
@@ -18,8 +18,10 @@ namespace kale {
 namespace {
 const int kMaxTunNum = 1024;
 }
+
 const char *kTunDevRoot = "/dev/net/tun";
-kl::Result<std::tuple<int, std::string>> AllocateTun(const char *ifname) {
+
+kl::Result<int> AllocateTun(const char *ifname) {
   struct ifreq ifr;
   int fd = ::open(kTunDevRoot, O_RDWR);
   if (fd < 0) {
@@ -35,12 +37,32 @@ kl::Result<std::tuple<int, std::string>> AllocateTun(const char *ifname) {
     ::close(fd);
     return kl::Err(errno, std::strerror(errno));
   }
-  return kl::Ok(std::make_tuple(fd, std::string(ifr.ifr_name)));
+  return kl::Ok(fd);
 }
 
 std::string RandomTunName() {
   int num = kMaxTunNum * kl::random::UniformSampleFloat();
   return kl::FormatString("tun%d", num);
+}
+
+kl::Result<int> AllocateTunInterface(const char *ifname, const char *host,
+                                     const char *mask) {
+  auto alloc_tun = AllocateTun(ifname);
+  if (!alloc_tun) {
+    return kl::Err(alloc_tun.MoveErr());
+  }
+  int tun_fd = *alloc_tun;
+  auto set_addr = kl::netdev::SetAddress(ifname, host);
+  if (!set_addr) {
+    ::close(tun_fd);
+    return kl::Err(set_addr.MoveErr());
+  }
+  auto set_mask = kl::netdev::SetNetMask(ifname, mask);
+  if (!set_mask) {
+    ::close(tun_fd);
+    return kl::Err(set_mask.MoveErr());
+  }
+  return kl::Ok(tun_fd);
 }
 
 }  // namespace kale

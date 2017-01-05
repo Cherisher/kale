@@ -10,8 +10,10 @@ namespace kale {
 
 extern const char *kTunDevRoot;
 
-// RETURN: (fd, ifname)
-kl::Result<std::tuple<int, std::string>> AllocateTun(const char *ifname);
+// RETURN: fd
+kl::Result<int> AllocateTun(const char *ifname);
+kl::Result<int> AllocateTunInterface(const char *ifname, const char *host,
+                                     const char *mask);
 std::string RandomTunName();
 
 }  // namespace kale
