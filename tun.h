@@ -12,6 +12,7 @@ extern const char *kTunDevRoot;
 
 // RETURN: (fd, ifname)
 kl::Result<std::tuple<int, std::string>> AllocateTun(const char *ifname);
+std::string RandomTunName();
 
 }  // namespace kale
 #endif

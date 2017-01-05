@@ -11,9 +11,13 @@
 #include <cstring>
 #include <cstring>
 
+#include "kl/random.h"
 #include "tun.h"
 
 namespace kale {
+namespace {
+const int kMaxTunNum = 1024;
+}
 const char *kTunDevRoot = "/dev/net/tun";
 kl::Result<std::tuple<int, std::string>> AllocateTun(const char *ifname) {
   struct ifreq ifr;
@@ -32,6 +36,11 @@ kl::Result<std::tuple<int, std::string>> AllocateTun(const char *ifname) {
     return kl::Err(errno, std::strerror(errno));
   }
   return kl::Ok(std::make_tuple(fd, std::string(ifr.ifr_name)));
+}
+
+std::string RandomTunName() {
+  int num = kMaxTunNum * kl::random::UniformSampleFloat();
+  return kl::FormatString("tun%d", num);
 }
 
 }  // namespace kale

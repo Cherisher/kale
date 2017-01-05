@@ -2,20 +2,28 @@
 
 KL := kl
 KL_LIB := $(KL)/libkl.a
+SNAPPY := snappy
+SNAPPY_LIB := libsnappy.a
 CXX := clang++
 CXXFLAGS := -Wall -g -std=c++14 -O2
-LDFLAGS := -L. -lkale -L$(KL) -lkl
+LDFLAGS := -L. -lkale -lsnappy -L$(KL) -lkl
 STATICLIB := libkale.a
 OBJECTS := tun.o
 TESTS := $(patsubst %.cc, %, $(wildcard *_test.cc))
 
 all: $(STATICLIB) $(TESTS)
 
+$(SNAPPY_LIB): $(SNAPPY)
+	@cd $< && ./autogen.sh && ./configure && $(MAKE) && cp .libs/libsnappy.a ../
+
+$(SNAPPY):
+	@git submodule update --remote $@
+
 $(KL_LIB): $(KL)
 	$(MAKE) -C $< all
 
 $(KL):
-	git submodule update --remote $@
+	@git submodule update --remote $@
 
 %.o: %.cc
 	$(CXX) $(CXXFLAGS) -fPIC -c $<
@@ -23,7 +31,7 @@ $(KL):
 $(STATICLIB): $(OBJECTS)
 	@ar rcsv $@ $^
 
-$(TESTS): $(STATICLIB) $(KL_LIB)
+$(TESTS): $(STATICLIB) $(KL_LIB) $(SNAPPY_LIB)
 
 $(TESTS): %_test: %_test.o
 	$(CXX) $(CXXFLAGS) $< -o $@ $(LDFLAGS)
