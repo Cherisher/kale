@@ -45,17 +45,22 @@ std::string RandomTunName() {
   return kl::FormatString("tun%d", num);
 }
 
-kl::Result<int> AllocateTunInterface(const char *ifname, const char *host,
-                                     const char *mask) {
+kl::Result<int> AllocateTunInterface(const char *ifname, const char *addr,
+                                     const char *dstaddr, const char *mask) {
   auto alloc_tun = AllocateTun(ifname);
   if (!alloc_tun) {
     return kl::Err(alloc_tun.MoveErr());
   }
   int tun_fd = *alloc_tun;
-  auto set_addr = kl::netdev::SetAddress(ifname, host);
+  auto set_addr = kl::netdev::SetAddress(ifname, addr);
   if (!set_addr) {
     ::close(tun_fd);
     return kl::Err(set_addr.MoveErr());
+  }
+  auto set_dstaddr = kl::netdev::SetDestAddress(ifname, dstaddr);
+  if (!set_dstaddr) {
+    ::close(tun_fd);
+    return kl::Err(set_dstaddr.MoveErr());
   }
   auto set_mask = kl::netdev::SetNetMask(ifname, mask);
   if (!set_mask) {

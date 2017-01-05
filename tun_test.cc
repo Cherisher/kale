@@ -30,7 +30,8 @@ TEST(T, Allocation) {
 
 TEST(T, LoopTun) {
   const std::string message("imfao|wtf|rofl");
-  const char *host = "10.0.0.1";
+  const char *addr = "10.0.0.1";
+  const char *dstaddr = "10.0.0.2";
   const char *mask = "255.255.255.255";
   uint16_t port = 4000;
   // launch 3 threads, loop tun thread, listen thread and connect thread.
@@ -38,7 +39,7 @@ TEST(T, LoopTun) {
   kl::WaitGroup tun_wait;
   tun_wait.Add();
   tun_wait.Add();
-  auto tun_if = kale::AllocateTunInterface("tun23", host, mask);
+  auto tun_if = kale::AllocateTunInterface("tun23", addr, dstaddr, mask);
   ASSERT(tun_if);
   auto tun_thread = std::thread([&tun_wait, tun_fd = *tun_if ] {
     KL_DEBUG("tun thread starts to work");
@@ -47,7 +48,7 @@ TEST(T, LoopTun) {
     tun_wait.Wait();
   });
   // prepare listen
-  auto listen = kl::tcp::Listen(host, port);
+  auto listen = kl::tcp::Listen(addr, port);
   ASSERT(listen);
   int listen_fd = *listen;
   // listen thread
@@ -73,10 +74,10 @@ TEST(T, LoopTun) {
     tun_wait.Done();
   }).detach();
   // connect thread
-  std::thread([&tun_wait, &message, host, port]() {
+  std::thread([&tun_wait, &message, addr, port]() {
     KL_DEBUG("connect thread starts to work");
     kl::env::Defer defer([] { KL_DEBUG("connect thread exiting"); });
-    auto connect = kl::tcp::BlockingConnect(host, port);
+    auto connect = kl::tcp::BlockingConnect(addr, port);
     ASSERT(connect);
     int fd = *connect;
     defer([fd] {

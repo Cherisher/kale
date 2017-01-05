@@ -12,8 +12,8 @@ extern const char *kTunDevRoot;
 
 // RETURN: fd
 kl::Result<int> AllocateTun(const char *ifname);
-kl::Result<int> AllocateTunInterface(const char *ifname, const char *host,
-                                     const char *mask);
+kl::Result<int> AllocateTunInterface(const char *ifname, const char *addr,
+                                     const char *dstaddr, const char *mask);
 std::string RandomTunName();
 
 }  // namespace kale
