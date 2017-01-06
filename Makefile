@@ -10,7 +10,7 @@ CXX := clang++
 CXXFLAGS := -Wall -g -std=c++14 -I$(LIBPCAP)
 LDFLAGS := -lpthread -L. -lkale -lsnappy -lpcap -L$(KL) -lkl
 STATICLIB := libkale.a
-OBJECTS := tun.o
+OBJECTS := tun.o pcap++.o
 TESTS := $(patsubst %.cc, %, $(wildcard *_test.cc))
 
 all: $(STATICLIB) $(TESTS)
