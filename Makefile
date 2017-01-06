@@ -5,7 +5,7 @@ KL_LIB := $(KL)/libkl.a
 SNAPPY := snappy
 SNAPPY_LIB := libsnappy.a
 CXX := clang++
-CXXFLAGS := -Wall -g -std=c++14 -O2
+CXXFLAGS := -Wall -g -std=c++14
 LDFLAGS := -lpthread -L. -lkale -lsnappy -L$(KL) -lkl
 STATICLIB := libkale.a
 OBJECTS := tun.o lo_tun.o
