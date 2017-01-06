@@ -18,6 +18,21 @@ inline kl::Result<std::string> DefaultDevice() {
   return kl::Ok(std::string(dev));
 }
 
+class Sniffer {
+public:
+  explicit Sniffer(const char *ifname);
+  kl::Result<void> CompileAndInstall(const char *filter_expr);
+  void Close();
+  const uint8_t *NextPacket(struct pcap_pkthdr *header);
+  ~Sniffer();
+
+private:
+  std::string ifname_;
+  pcap_t *handle_;
+  bpf_u_int32 net_, mask_;
+  struct bpf_program filter_;
+};
+
 }  // namespace pcap
 }  // namespace
 #endif
