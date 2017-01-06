@@ -30,7 +30,7 @@ TEST(T, Allocation) {
   ::close(*alloc);
 }
 
-TEST(T, Tun) {
+TEST(T, UDPTun) {
   const std::string message("imfao|wtf|rofl");
   const char *addr = "10.0.0.1";
   const char *dstaddr = "10.0.0.2";
