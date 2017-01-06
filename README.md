@@ -1,3 +1,3 @@
 kale
 --------------------------------
-A lag VPN
+A lag proxy library.
