@@ -15,9 +15,6 @@
 #include "tun.h"
 
 namespace kale {
-namespace {
-const int kMaxTunNum = 1024;
-}
 
 const char *kTunDevRoot = "/dev/net/tun";
 
@@ -41,6 +38,7 @@ kl::Result<int> AllocateTun(const char *ifname) {
 }
 
 std::string RandomTunName() {
+  static const int kMaxTunNum = 1024;
   int num = kMaxTunNum * kl::random::UniformSampleFloat();
   return kl::FormatString("tun%d", num);
 }
