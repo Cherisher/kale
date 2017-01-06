@@ -7,3 +7,6 @@
 [submodule "libpcap"]
 	path = libpcap
 	url = git://github.com/the-tcpdump-group/libpcap.git
+[submodule "libnet"]
+	path = libnet
+	url = git://github.com/sam-github/libnet.git
