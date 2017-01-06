@@ -4,6 +4,7 @@
 #include <string>
 #include <tuple>
 
+#include "kl/epoll.h"
 #include "kl/error.h"
 
 namespace kale {
