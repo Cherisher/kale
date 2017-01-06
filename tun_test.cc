@@ -71,4 +71,13 @@ TEST(T, UDPTun) {
   send_thread.join();
 }
 
+TEST(T, RawIPv4Socket) {
+  auto raw = kale::RawIPv4Socket();
+  if (!raw) {
+    KL_DEBUG(raw.Err().ToCString());
+  }
+  ASSERT(raw);
+  ::close(*raw);
+}
+
 int main() { return KL_TEST(); }

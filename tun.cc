@@ -70,4 +70,17 @@ kl::Result<int> AllocateTunInterface(const char *ifname, const char *addr,
   return kl::Ok(tun_fd);
 }
 
+kl::Result<int> RawIPv4Socket() {
+  int fd = ::socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
+  if (fd < 0) {
+    return kl::Err(errno, "failed creating socket: %s", std::strerror(errno));
+  }
+  const int on = 1;
+  if (::setsockopt(fd, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on)) < 0) {
+    ::close(fd);
+    return kl::Err(errno, std::strerror(errno));
+  }
+  return kl::Ok(fd);
+}
+
 }  // namespace kale

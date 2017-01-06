@@ -17,5 +17,7 @@ kl::Result<int> AllocateTunInterface(const char *ifname, const char *addr,
                                      const char *dstaddr, const char *mask);
 std::string RandomTunName();
 
+kl::Result<int> RawIPv4Socket();
+
 }  // namespace kale
 #endif
