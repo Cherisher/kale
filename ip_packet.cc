@@ -7,8 +7,15 @@
 namespace kale {
 namespace ip_packet {
 
-bool IsUDP(const uint8_t *packet, size_t len) { return packet[9] == 0x11; }
-bool IsTCP(const uint8_t *packet, size_t len) { return packet[9] == 0x06; }
+bool IsUDP(const uint8_t *packet, size_t len) {
+  assert(len >= 10);
+  return packet[9] == 0x11;
+}
+
+bool IsTCP(const uint8_t *packet, size_t len) {
+  assert(len >= 10);
+  return packet[9] == 0x06;
+}
 
 uint16_t IPHeaderCheckSum(const uint8_t *packet, size_t len) {
   uint16_t header_len = (0x0f & packet[0]) << 2;
