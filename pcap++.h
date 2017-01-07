@@ -22,9 +22,9 @@ class Sniffer {
 public:
   explicit Sniffer(const char *ifname);
   kl::Result<void> CompileAndInstall(const char *filter_expr);
-  kl::Result<int> Loop(int count,
-                       std::function<void(const struct pcap_pkthdr *header,
-                                          const uint8_t *packet)> &&callback);
+  kl::Result<void> Loop(int count,
+                        std::function<void(const struct pcap_pkthdr *header,
+                                           const uint8_t *packet)> &&callback);
   void BreakLoop();
   void Close();
   const uint8_t *NextPacket(struct pcap_pkthdr *header);
