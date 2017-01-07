@@ -40,6 +40,7 @@ private:
   struct bpf_program filter_;
   std::function<void(const struct pcap_pkthdr *header, const uint8_t *packet)>
       callback_;
+  char errbuf_[PCAP_ERRBUF_SIZE];
 };
 
 }  // namespace pcap

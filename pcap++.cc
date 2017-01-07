@@ -11,15 +11,15 @@ namespace kale {
 namespace pcap {
 
 Sniffer::Sniffer(const char *ifname) : ifname_(ifname), handle_(nullptr) {
-  char dev[IFNAMSIZ], errbuf[PCAP_ERRBUF_SIZE];
+  char dev[IFNAMSIZ];
   ::strncpy(dev, ifname, IFNAMSIZ - 1);
-  int err = pcap_lookupnet(dev, &net_, &mask_, errbuf);
+  int err = pcap_lookupnet(dev, &net_, &mask_, errbuf_);
   if (err < 0) {
-    throw std::runtime_error(errbuf);
+    throw std::runtime_error(errbuf_);
   }
-  handle_ = pcap_open_live(dev, BUFSIZ, 1, 1024, errbuf);
+  handle_ = pcap_open_live(dev, BUFSIZ, 1, 1024, errbuf_);
   if (handle_ == nullptr) {
-    throw std::runtime_error(errbuf);
+    throw std::runtime_error(errbuf_);
   }
 }
 
