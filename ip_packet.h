@@ -17,7 +17,6 @@ void ChangeDstAddr(uint8_t *packet, size_t len, uint32_t addr);
 void ChangeUDPPort(uint8_t *segment, size_t len, uint16_t port);
 void ChangeTCPPort(uint8_t *segment, size_t len, uint16_t port);
 
-// https://tools.ietf.org/html/rfc791
 // @return: in network byte order
 uint16_t IPHeaderCheckSum(const uint8_t *packet, size_t len);
 uint16_t TCPCheckSum(const uint8_t *segment, size_t len);

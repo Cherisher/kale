@@ -33,6 +33,7 @@ void ChangeDstAddr(uint8_t *packet, size_t len, uint32_t addr) {
   *reinterpret_cast<uint16_t *>(packet + 10) = checksum;
 }
 
+// https://tools.ietf.org/html/rfc791
 uint16_t IPHeaderCheckSum(const uint8_t *packet, size_t len) {
   uint16_t header_len = IPHeaderLength(packet, len);
   assert(len >= header_len);
