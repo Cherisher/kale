@@ -8,8 +8,7 @@ namespace kale {
 namespace ip_packet {
 
 uint16_t IPHeaderCheckSum(const uint8_t *packet, size_t len) {
-  uint16_t ihl = 0x0f & packet[0];
-  uint16_t header_len = ihl << 2;
+  uint16_t header_len = (0x0f & packet[0]) << 2;
   assert(len >= header_len);
   uint32_t sum = 0;
   for (int i = 0; i < header_len; i = i + 2) {
