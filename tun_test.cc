@@ -67,11 +67,10 @@ TEST(T, UDPTun) {
   // minimum ip header size + minimum udp header size = 20 + 8 = 28
   ASSERT(nread >= 28);
   KL_DEBUG("read %d bytes", nread);
-  KL_DEBUG("header origin check sum: %u",
-           *reinterpret_cast<uint16_t *>(buf + 10));
-  KL_DEBUG("header check sum: %u",
-           kale::ip_packet::IPHeaderCheckSum(
-               reinterpret_cast<const uint8_t *>(buf), nread));
+  // header check sum
+  ASSERT(*reinterpret_cast<uint16_t *>(buf + 10) ==
+         kale::ip_packet::IPHeaderCheckSum(
+             reinterpret_cast<const uint8_t *>(buf), nread));
   buf[nread] = '\0';
   ASSERT(std::string(buf + 28) == message);
   send_thread.join();
