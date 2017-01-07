@@ -47,6 +47,28 @@ const uint8_t *Sniffer::NextPacket(struct pcap_pkthdr *header) {
   return pcap_next(handle_, header);
 }
 
+kl::Result<void>
+Sniffer::Loop(int count,
+              std::function<void(const struct pcap_pkthdr *header,
+                                 const uint8_t *packet)> &&callback) {
+  callback_ = std::move(callback);
+  int err = pcap_loop(handle_, count, &Sniffer::ExcecutePcapHandler,
+                      reinterpret_cast<uint8_t *>(this));
+  if (err < 0) {
+    kl::Err("%s: pcap_loop internal error %s\n", ifname_.c_str(),
+            pcap_geterr(handle_));
+  }
+  return kl::Ok();
+}
+
+void Sniffer::ExcecutePcapHandler(uint8_t *user,
+                                  const struct pcap_pkthdr *header,
+                                  const uint8_t *packet) {
+  return reinterpret_cast<Sniffer *>(user)->callback_(header, packet);
+}
+
+void Sniffer::BreakLoop() { return pcap_breakloop(handle_); }
+
 Sniffer::~Sniffer() { Close(); }
 
 }  // namespace pcap
