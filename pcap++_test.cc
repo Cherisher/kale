@@ -4,6 +4,7 @@
 
 #include "kl/logger.h"
 #include "kl/netdev.h"
+#include "kl/string.h"
 #include "kl/testkit.h"
 #include "kl/udp.h"
 #include "pcap++.h"
@@ -36,7 +37,7 @@ TEST(T, UDPDump) {
   const int kNumOfPackets = 1 << 20;
   kale::pcap::Sniffer sniffer("lo");
   auto compile = sniffer.CompileAndInstall(
-      kl::FormatString("udp and port %u", port).c_str());
+      kl::string::FormatString("udp and port %u", port).c_str());
   ASSERT(compile);
   auto send_thread = std::thread([ifname, port, message] {
     auto addr = kl::netdev::GetAddress(ifname);
@@ -74,7 +75,7 @@ TEST(T, Loop) {
   const int kNumOfPackets = 1 << 20;
   kale::pcap::Sniffer sniffer("lo");
   auto compile = sniffer.CompileAndInstall(
-      kl::FormatString("udp and port %u", port).c_str());
+      kl::string::FormatString("udp and port %u", port).c_str());
   ASSERT(compile);
   auto send_thread = std::thread([ifname, port, &message, &sniffer] {
     auto addr = kl::netdev::GetAddress(ifname);

@@ -12,6 +12,7 @@
 
 #include "kl/netdev.h"
 #include "kl/random.h"
+#include "kl/string.h"
 #include "tun.h"
 
 namespace kale {
@@ -40,7 +41,7 @@ kl::Result<int> AllocateTun(const char *ifname) {
 std::string RandomTunName() {
   static const int kMaxTunNum = 1024;
   int num = kMaxTunNum * kl::random::UniformSampleFloat();
-  return kl::FormatString("tun%d", num);
+  return kl::string::FormatString("tun%d", num);
 }
 
 kl::Result<int> AllocateTunInterface(const char *ifname, const char *addr,
