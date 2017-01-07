@@ -64,15 +64,11 @@ TEST(T, UDPDump) {
   send_thread.join();
 }
 
-void LoopAndBreakLoopHandler(uint8_t *user, const struct pcap_pkthdr *header,
-                             const uint8_t *packet) {
-  KL_DEBUG("packet size: %u", header->len);
-}
-
-TEST(T, LoopAndBreakLoop) {
+TEST(T, Loop) {
   const std::string message("wtf~imfao~rofl");
   const char *ifname = "lo";
   const uint16_t port = 4000;
+  const int kNumOfPackets = 1 << 20;
   kale::pcap::Sniffer sniffer("lo");
   auto compile = sniffer.CompileAndInstall(
       kl::FormatString("udp and port %u", port).c_str());
@@ -84,28 +80,29 @@ TEST(T, LoopAndBreakLoop) {
     auto sock = kl::udp::Socket();
     ASSERT(sock);
     kl::env::Defer defer([fd = *sock] { ::close(fd); });
-    auto send = kl::inet::Sendto(*sock, message.c_str(), message.size(), 0,
-                                 (*addr).c_str(), port);
-    KL_DEBUG("packet sent");
-    ASSERT(send);
-    sniffer.BreakLoop();
-    KL_DEBUG("break loop called");
+    for (int i = 0; i < kNumOfPackets; ++i) {
+      auto send = kl::inet::Sendto(*sock, message.c_str(), message.size(), 0,
+                                   (*addr).c_str(), port);
+      ASSERT(send);
+    }
   });
-  auto callback = [&message](const struct pcap_pkthdr *header,
-                             const uint8_t *packet) {
-    KL_DEBUG("packet size: %u", header->len);
+  int counter = 0;
+  auto callback = [&message, &counter](const struct pcap_pkthdr *header,
+                                       const uint8_t *packet) {
+    ++counter;
+    // KL_DEBUG("packet size: %u", header->len);
     ASSERT(header->len >= message.size());
     ASSERT(std::string(packet + header->len - message.size(),
                        packet + header->len) == message);
   };
   KL_DEBUG("entering loop");
   auto start = std::chrono::high_resolution_clock::now();
-  // FIXME(Kai Luo): sniffer.Loop costs too much time
-  auto loop = sniffer.Loop(-1, callback);
+  auto loop = sniffer.Loop(kNumOfPackets, callback);
   auto now = std::chrono::high_resolution_clock::now();
   std::chrono::duration<float> diff = now - start;
   KL_DEBUG("sniffer.Loop costs %fs", diff.count());
   ASSERT(loop);
+  ASSERT(counter == kNumOfPackets);
   KL_DEBUG("loop exited");
   send_thread.join();
 }

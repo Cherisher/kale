@@ -4,6 +4,7 @@
 #include <cstring>
 #include <stdexcept>
 
+#include "kl/logger.h"
 #include "pcap++.h"
 
 namespace kale {
@@ -37,8 +38,8 @@ kl::Result<void> Sniffer::CompileAndInstall(const char *filter_expr) {
   }
   err = pcap_setfilter(handle_, &filter_);
   if (err < 0) {
-    kl::Err("%s: Couldn't install filter %s: %s\n", ifname_.c_str(),
-            filter_expr, pcap_geterr(handle_));
+    return kl::Err("%s: Couldn't install filter %s: %s\n", ifname_.c_str(),
+                   filter_expr, pcap_geterr(handle_));
   }
   return kl::Ok();
 }
@@ -47,18 +48,18 @@ const uint8_t *Sniffer::NextPacket(struct pcap_pkthdr *header) {
   return pcap_next(handle_, header);
 }
 
-kl::Result<void>
+kl::Result<int>
 Sniffer::Loop(int count,
               std::function<void(const struct pcap_pkthdr *header,
                                  const uint8_t *packet)> &&callback) {
   callback_ = std::move(callback);
-  int err = pcap_loop(handle_, count, &Sniffer::ExcecutePcapHandler,
-                      reinterpret_cast<uint8_t *>(this));
-  if (err < 0) {
-    kl::Err("%s: pcap_loop internal error %s\n", ifname_.c_str(),
-            pcap_geterr(handle_));
+  int nread = pcap_loop(handle_, count, &Sniffer::ExcecutePcapHandler,
+                        reinterpret_cast<uint8_t *>(this));
+  if (nread < 0) {
+    return kl::Err("%s: pcap_loop internal error %s\n", ifname_.c_str(),
+                   pcap_geterr(handle_));
   }
-  return kl::Ok();
+  return kl::Ok(nread);
 }
 
 void Sniffer::ExcecutePcapHandler(uint8_t *user,
