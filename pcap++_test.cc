@@ -103,7 +103,7 @@ TEST(T, Loop) {
   KL_DEBUG("sniffer.Loop costs %fs", diff.count());
   ASSERT(loop);
   ASSERT(counter == kNumOfPackets);
-  KL_DEBUG("loop exited");
+  KL_DEBUG("loop exited, %d packets captured", counter);
   send_thread.join();
 }
 
