@@ -7,7 +7,7 @@ SNAPPY_LIB := libsnappy.a
 LIBPCAP := libpcap
 LIBPCAP_LIB := libpcap.a
 CXX := clang++
-CXXFLAGS := -Wall -g -std=c++14 -I$(LIBPCAP)
+CXXFLAGS := -Wall -g -std=c++14 -I$(LIBPCAP) -O2
 LDFLAGS := -lpthread -L. -lkale -lsnappy -lpcap -L$(KL) -lkl
 STATICLIB := libkale.a
 OBJECTS := tun.o pcap++.o
