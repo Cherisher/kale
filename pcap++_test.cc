@@ -91,7 +91,6 @@ TEST(T, LoopAndBreakLoop) {
     sniffer.BreakLoop();
     KL_DEBUG("break loop called");
   });
-  KL_DEBUG("entering loop");
   auto callback = [&message](const struct pcap_pkthdr *header,
                              const uint8_t *packet) {
     KL_DEBUG("packet size: %u", header->len);
@@ -99,7 +98,7 @@ TEST(T, LoopAndBreakLoop) {
     ASSERT(std::string(packet + header->len - message.size(),
                        packet + header->len) == message);
   };
-  KL_DEBUG("waiting for packet");
+  KL_DEBUG("entering loop");
   auto start = std::chrono::high_resolution_clock::now();
   // FIXME(Kai Luo): sniffer.Loop costs too much time
   auto loop = sniffer.Loop(-1, callback);
