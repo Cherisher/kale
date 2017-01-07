@@ -6,10 +6,9 @@
 namespace kale {
 namespace ip_packet {
 
+// All these functions won't validate packet.
 bool IsUDP(const uint8_t *packet, size_t len);
 bool IsTCP(const uint8_t *packet, size_t len);
-
-// All these functions won't validate packet.
 // @addr, @port in network byte order.
 void ChangeDstAddr(uint8_t *packet, size_t len, uint32_t addr);
 void ChangeSrcAddr(uint8_t *packet, size_t len, uint32_t addr);

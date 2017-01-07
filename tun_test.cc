@@ -67,6 +67,8 @@ TEST(T, UDPTun) {
   // minimum ip header size + minimum udp header size = 20 + 8 = 28
   ASSERT(nread >= 28);
   KL_DEBUG("read %d bytes", nread);
+  // protocol type
+  ASSERT(kale::ip_packet::IsUDP(reinterpret_cast<const uint8_t *>(buf), nread));
   // header check sum
   ASSERT(*reinterpret_cast<uint16_t *>(buf + 10) ==
          kale::ip_packet::IPHeaderCheckSum(
