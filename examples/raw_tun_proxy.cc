@@ -70,35 +70,48 @@ static int RunIt(const std::string &remote_host, uint16_t remote_port,
     for (const auto &event : *wait) {
       int fd = event.data.fd;
       if (event.events & EPOLLIN) {
-        int nread = ::read(fd, buf, sizeof(buf));
-        if (nread < 0) {
-          KL_ERROR(std::strerror(errno));
-          return 1;
-        }
-        KL_DEBUG("read %d bytes", nread);
-        if (kale::ip_packet::IsUDP(reinterpret_cast<const uint8_t *>(buf),
-                                   nread)) {
-          KL_DEBUG("udp protocol");
-        } else if (kale::ip_packet::IsTCP(reinterpret_cast<uint8_t *>(buf),
-                                          nread)) {
-          KL_DEBUG("tcp protocol");
-        }
-        if (fd == tun_fd) {
-          auto write =
-              WriteInet(udp_fd, buf, nread, remote_host.c_str(), remote_port);
-          if (!write) {
-            KL_ERROR(write.Err().ToCString());
+        // read until EAGAIN or EWOULDBLOCK
+        while (true) {
+          int nread = ::read(fd, buf, sizeof(buf));
+          if (nread < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+              break;
+            }
+            KL_ERROR(std::strerror(errno));
             return 1;
           }
-        } else if (fd == udp_fd) {
-          auto write = WriteTun(tun_fd, buf, nread);
-          if (!write) {
-            KL_ERROR(write.Err().ToCString());
-            return 1;
+          KL_DEBUG("read %d bytes", nread);
+          if (kale::ip_packet::IsUDP(reinterpret_cast<const uint8_t *>(buf),
+                                     nread)) {
+            KL_DEBUG("udp protocol");
+          } else if (kale::ip_packet::IsTCP(reinterpret_cast<uint8_t *>(buf),
+                                            nread)) {
+            KL_DEBUG("tcp protocol");
           }
+          if (fd == tun_fd) {
+            auto write =
+                WriteInet(udp_fd, buf, nread, remote_host.c_str(), remote_port);
+            if (!write) {
+              KL_ERROR(write.Err().ToCString());
+              return 1;
+            }
+          } else if (fd == udp_fd) {
+            auto write = WriteTun(tun_fd, buf, nread);
+            if (!write) {
+              KL_ERROR(write.Err().ToCString());
+              return 1;
+            }
+          }
+        }  // end while
+      }    // end EPOLLIN handle
+      if (event.events & EPOLLERR) {
+        int error = 0;
+        socklen_t len = sizeof(error);
+        if (::getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &len) == 0) {
+          KL_ERROR(std::strerror(error));
+        } else {
+          KL_ERROR("EPOLLERR");
         }
-      } else if (event.events & EPOLLERR) {
-        KL_ERROR("EPOLLERR");
         return 1;
       }
     }
