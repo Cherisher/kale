@@ -1,7 +1,7 @@
 .PHONY: all clean test
 
 CXX := clang++
-CXXFLAGS := -Wall -g -std=c++14 -I..  -O2
+CXXFLAGS := -Wall -g -std=c++14 -I.. -O2
 LDFLAGS := -lpthread -L.. -lkale -lsnappy -lpcap -lnet -lkl
 TARGETS := raw_tun_proxy
 
