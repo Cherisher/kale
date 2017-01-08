@@ -6,8 +6,11 @@
 #include <string>
 
 #include "ip_packet.h"
+#include "kl/env.h"
+#include "kl/epoll.h"
 #include "kl/inet.h"
 #include "kl/logger.h"
+#include "kl/netdev.h"
 #include "kl/string.h"
 #include "kl/udp.h"
 #include "tun.h"
@@ -20,6 +23,47 @@ void PrintUsage(int argc, char *argv[]) {
                        "    -d <tun_dstaddr>\n"
                        "    -m <tun_mask>\n",
                argv[0]);
+}
+
+int RunIt(const std::string &remote_host, uint16_t remote_port, int tun_fd) {
+  auto udp_sock = kl::udp::Socket();
+  if (!udp_sock) {
+    KL_ERROR(udp_sock.Err().ToCString());
+    return 1;
+  }
+  int udp_fd = *udp_sock;
+  kl::env::Defer defer([fd = udp_fd] { ::close(fd); });
+  auto set_nb = kl::env::SetNonBlocking(udp_fd);
+  if (!set_nb) {
+    KL_ERROR(set_nb.Err().ToCString());
+    return 1;
+  }
+  char buf[65536];
+  kl::Epoll epoll;
+  epoll.AddFd(tun_fd, EPOLLET | EPOLLIN);
+  epoll.AddFd(udp_fd, EPOLLET | EPOLLIN);
+  while (true) {
+    auto wait = epoll.Wait(2, -1);
+    if (!wait) {
+      KL_ERROR(wait.Err().ToCString());
+      return 1;
+    }
+    for (const auto &event : *wait) {
+      int fd = event.data.fd;
+      if (event.events & EPOLLIN) {
+        int nread = ::read(fd, buf, sizeof(buf));
+        if (nread < 0) {
+          KL_ERROR(std::strerror(errno));
+          return 1;
+        }
+        KL_DEBUG("read %d bytes", nread);
+      } else if (event.events & EPOLLERR) {
+        KL_ERROR("EPOLLERR");
+        return 1;
+      }
+    }
+  }
+  return 0;
 }
 
 int main(int argc, char *argv[]) {
@@ -69,5 +113,29 @@ int main(int argc, char *argv[]) {
     PrintUsage(argc, argv);
     ::exit(1);
   }
-  return 0;
+  auto tun_if =
+      kale::AllocateTunInterface(tun_name.c_str(), tun_addr.c_str(),
+                                 tun_dstaddr.c_str(), tun_mask.c_str());
+  if (!tun_if) {
+    std::fprintf(stderr, "%s\n", tun_if.Err().ToCString());
+    ::exit(1);
+  }
+  kl::env::Defer defer([fd = *tun_if] { ::close(fd); });
+  auto set_nb = kl::env::SetNonBlocking(*tun_if);
+  if (!set_nb) {
+    std::fprintf(stderr, "%s\n", set_nb.Err().ToCString());
+    ::exit(1);
+  }
+  auto if_up = kl::netdev::InterfaceUp(tun_name.c_str());
+  if (!if_up) {
+    std::fprintf(stderr, "%s\n", if_up.Err().ToCString());
+    ::exit(1);
+  }
+  auto add_route = kl::netdev::AddRoute(tun_name.c_str(), tun_addr.c_str(),
+                                        tun_mask.c_str());
+  if (!add_route) {
+    std::fprintf(stderr, "%s\n", add_route.Err().ToCString());
+    ::exit(1);
+  }
+  return RunIt(remote_host, remote_port, *tun_if);
 }
