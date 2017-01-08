@@ -32,7 +32,7 @@ TEST(T, Allocation) {
 }
 
 TEST(T, UDPTun) {
-  const std::string message("imfao|wtf|rofl");
+  const std::string message("imfao|wtf|rofl~~|rekt");
   const char *addr = "10.0.0.1";
   const char *dstaddr = "10.0.0.2";
   const char *mask = "255.255.255.255";
@@ -70,9 +70,27 @@ TEST(T, UDPTun) {
   // protocol type
   ASSERT(kale::ip_packet::IsUDP(reinterpret_cast<const uint8_t *>(buf), nread));
   // header check sum
+  KL_DEBUG("ip header actual checksum: %u",
+           *reinterpret_cast<uint16_t *>(buf + 10));
+  KL_DEBUG("ip header checksum calculated: %u",
+           kale::ip_packet::IPHeaderChecksum(
+               reinterpret_cast<const uint8_t *>(buf), nread));
   ASSERT(*reinterpret_cast<uint16_t *>(buf + 10) ==
-         kale::ip_packet::IPHeaderCheckSum(
+         kale::ip_packet::IPHeaderChecksum(
              reinterpret_cast<const uint8_t *>(buf), nread));
+  // udp check sum
+  const uint8_t *segment = reinterpret_cast<const uint8_t *>(
+      buf + kale::ip_packet::IPHeaderLength(
+                reinterpret_cast<const uint8_t *>(buf), nread));
+  ASSERT(ntohs(*reinterpret_cast<const uint16_t *>(segment)) == port);
+  ASSERT(ntohs(*reinterpret_cast<const uint16_t *>(segment + 2)) == 80);
+  uint16_t checksum = *reinterpret_cast<const uint16_t *>(segment + 6);
+  KL_DEBUG("udp actual checksum: %u", checksum);
+  KL_DEBUG("udp checksum calculated: %u",
+           kale::ip_packet::UDPChecksum(reinterpret_cast<const uint8_t *>(buf),
+                                        nread));
+  ASSERT(checksum == kale::ip_packet::UDPChecksum(
+                         reinterpret_cast<const uint8_t *>(buf), nread));
   buf[nread] = '\0';
   ASSERT(std::string(buf + 28) == message);
   send_thread.join();

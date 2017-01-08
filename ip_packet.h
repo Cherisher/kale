@@ -18,9 +18,9 @@ void ChangeUDPPort(uint8_t *segment, size_t len, uint16_t port);
 void ChangeTCPPort(uint8_t *segment, size_t len, uint16_t port);
 
 // @return: in network byte order
-uint16_t IPHeaderCheckSum(const uint8_t *packet, size_t len);
-uint16_t TCPCheckSum(const uint8_t *segment, size_t len);
-uint16_t UDPCheckSum(const uint8_t *segment, size_t len);
+uint16_t IPHeaderChecksum(const uint8_t *packet, size_t len);
+uint16_t TCPChecksum(const uint8_t *packet, size_t len);
+uint16_t UDPChecksum(const uint8_t *packet, size_t len);
 
 }  // namespace packet
 }  // namespace kale
