@@ -13,6 +13,7 @@
 #include "kl/netdev.h"
 #include "kl/string.h"
 #include "kl/udp.h"
+#include "snappy/snappy.h"
 #include "tun.h"
 
 void PrintUsage(int argc, char *argv[]) {
@@ -25,7 +26,25 @@ void PrintUsage(int argc, char *argv[]) {
                argv[0]);
 }
 
-int RunIt(const std::string &remote_host, uint16_t remote_port, int tun_fd) {
+static kl::Result<ssize_t> WriteTun(int tun_fd, const char *buf, int len) {
+  ssize_t nwrite = ::write(tun_fd, buf, len);
+  if (nwrite < 0) {
+    return kl::Err(errno, std::strerror(errno));
+  }
+  return kl::Ok(nwrite);
+}
+
+static kl::Result<ssize_t> WriteInet(int udp_fd, const char *buf, int len,
+                                     const char *host, uint16_t port) {
+  std::string compress;
+  size_t n = snappy::Compress(buf, len, &compress);
+  KL_DEBUG("origin len %d, compressed len %d", len, n);
+  return kl::inet::Sendto(udp_fd, compress.data(), compress.size(), 0, host,
+                          port);
+}
+
+static int RunIt(const std::string &remote_host, uint16_t remote_port,
+                 int tun_fd) {
   auto udp_sock = kl::udp::Socket();
   if (!udp_sock) {
     KL_ERROR(udp_sock.Err().ToCString());
@@ -43,7 +62,7 @@ int RunIt(const std::string &remote_host, uint16_t remote_port, int tun_fd) {
   epoll.AddFd(tun_fd, EPOLLET | EPOLLIN);
   epoll.AddFd(udp_fd, EPOLLET | EPOLLIN);
   while (true) {
-    auto wait = epoll.Wait(2, -1);
+    auto wait = epoll.Wait(4, -1);
     if (!wait) {
       KL_ERROR(wait.Err().ToCString());
       return 1;
@@ -57,6 +76,27 @@ int RunIt(const std::string &remote_host, uint16_t remote_port, int tun_fd) {
           return 1;
         }
         KL_DEBUG("read %d bytes", nread);
+        if (kale::ip_packet::IsUDP(reinterpret_cast<const uint8_t *>(buf),
+                                   nread)) {
+          KL_DEBUG("udp protocol");
+        } else if (kale::ip_packet::IsTCP(reinterpret_cast<uint8_t *>(buf),
+                                          nread)) {
+          KL_DEBUG("tcp protocol");
+        }
+        if (fd == tun_fd) {
+          auto write =
+              WriteInet(udp_fd, buf, nread, remote_host.c_str(), remote_port);
+          if (!write) {
+            KL_ERROR(write.Err().ToCString());
+            return 1;
+          }
+        } else if (fd == udp_fd) {
+          auto write = WriteTun(tun_fd, buf, nread);
+          if (!write) {
+            KL_ERROR(write.Err().ToCString());
+            return 1;
+          }
+        }
       } else if (event.events & EPOLLERR) {
         KL_ERROR("EPOLLERR");
         return 1;
