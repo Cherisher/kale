@@ -17,7 +17,7 @@
 #include "tun.h"
 
 void PrintUsage(int argc, char *argv[]) {
-  std::fprintf(stderr, "%s: \n"
+  std::fprintf(stderr, "%s:\n"
                        "    -r <remote_host:remote_port>\n"
                        "    -t <tun_name>\n"
                        "    -a <tun_addr>\n"
