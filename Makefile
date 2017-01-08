@@ -1,7 +1,7 @@
 .PHONY: all clean test
 
 KL := kl
-KL_LIB := $(KL)/libkl.a
+KL_LIB := libkl.a
 SNAPPY := snappy
 SNAPPY_LIB := libsnappy.a
 LIBPCAP := libpcap
@@ -10,7 +10,7 @@ LIBNET := libnet
 LIBNET_LIB := libnet.a
 CXX := clang++
 CXXFLAGS := -Wall -g -std=c++14 -I$(LIBPCAP) -I$(LIBNET)/libnet/include -O2
-LDFLAGS := -lpthread -L. -lkale -lsnappy -lpcap -lnet -L$(KL) -lkl
+LDFLAGS := -lpthread -L. -lkale -lsnappy -lpcap -lnet -lkl
 STATICLIB := libkale.a
 OBJECTS := tun.o pcap++.o ip_packet.o
 TESTS := $(patsubst %.cc, %, $(wildcard *_test.cc))
@@ -33,7 +33,7 @@ $(LIBPCAP):
 	@git submodule update --remote $@
 
 $(KL_LIB): $(KL)
-	$(MAKE) -C $< all
+	@cd $< && $(MAKE) all && cp libkl.a ../
 
 $(KL):
 	@git submodule update --remote $@
