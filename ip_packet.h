@@ -14,10 +14,17 @@ uint16_t IPHeaderLength(const uint8_t *packet, size_t len);
 // @addr, @port in network byte order.
 void ChangeSrcAddr(uint8_t *packet, size_t len, uint32_t addr);
 void ChangeDstAddr(uint8_t *packet, size_t len, uint32_t addr);
-void ChangeUDPPort(uint8_t *segment, size_t len, uint16_t port);
-void ChangeTCPPort(uint8_t *segment, size_t len, uint16_t port);
+void ChangeUDPSrcPort(uint8_t *packet, size_t len, uint16_t port);
+void ChangeUDPDstPort(uint8_t *packet, size_t len, uint16_t port);
+void ChangeTCPSrcPort(uint8_t *packet, size_t len, uint16_t port);
+void ChangeTCPDstPort(uint8_t *packet, size_t len, uint16_t port);
+uint8_t *SegmentBase(uint8_t *packet, size_t len);
+void IPFillChecksum(uint8_t *packet, size_t len);
+void UDPFillChecksum(uint8_t *packet, size_t len);
+void TCPFillChecksum(uint8_t *packet, size_t len);
 
 // @return: in network byte order
+// @x: in network byte order
 uint32_t ChecksumCarry(uint32_t x);
 uint16_t IPHeaderChecksum(const uint8_t *packet, size_t len);
 uint16_t TCPChecksum(const uint8_t *packet, size_t len);

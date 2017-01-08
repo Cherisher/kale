@@ -7,6 +7,7 @@
 namespace kale {
 // https://en.wikipedia.org/wiki/IPv4
 namespace ip_packet {
+
 uint16_t IPHeaderLength(const uint8_t *packet, size_t len) {
   return (0x0f & packet[0]) << 2;
 }
@@ -23,14 +24,44 @@ bool IsTCP(const uint8_t *packet, size_t len) {
 
 void ChangeSrcAddr(uint8_t *packet, size_t len, uint32_t addr) {
   *reinterpret_cast<uint32_t *>(packet + 12) = addr;
-  uint16_t checksum = IPHeaderChecksum(packet, len);
-  *reinterpret_cast<uint16_t *>(packet + 10) = checksum;
 }
 
 void ChangeDstAddr(uint8_t *packet, size_t len, uint32_t addr) {
   *reinterpret_cast<uint32_t *>(packet + 16) = addr;
-  uint16_t checksum = IPHeaderChecksum(packet, len);
-  *reinterpret_cast<uint16_t *>(packet + 10) = checksum;
+}
+
+void IPFillChecksum(uint8_t *packet, size_t len) {
+  *reinterpret_cast<uint16_t *>(packet + 10) = IPHeaderChecksum(packet, len);
+}
+
+uint8_t *SegmentBase(uint8_t *packet, size_t len) {
+  return packet + IPHeaderLength(packet, len);
+}
+
+void UDPFillChecksum(uint8_t *packet, size_t len) {
+  uint8_t *segment = SegmentBase(packet, len);
+  *reinterpret_cast<uint16_t *>(segment + 6) = UDPChecksum(packet, len);
+}
+
+void ChangeUDPSrcPort(uint8_t *packet, size_t len, uint16_t port) {
+  *reinterpret_cast<uint16_t *>(packet) = port;
+}
+
+void ChangeUDPDstPort(uint8_t *packet, size_t len, uint16_t port) {
+  *reinterpret_cast<uint16_t *>(packet + 2) = port;
+}
+
+void TCPFillChecksum(uint8_t *packet, size_t len) {
+  uint8_t *segment = SegmentBase(packet, len);
+  *reinterpret_cast<uint16_t *>(segment + 16) = TCPChecksum(packet, len);
+}
+
+void ChangeTCPSrcPort(uint8_t *packet, size_t len, uint16_t port) {
+  *reinterpret_cast<uint16_t *>(packet) = port;
+}
+
+void ChangeTCPDstPort(uint8_t *packet, size_t len, uint16_t port) {
+  *reinterpret_cast<uint16_t *>(packet + 2) = port;
 }
 
 uint32_t ChecksumCarry(uint32_t x) {
@@ -52,7 +83,30 @@ uint16_t IPHeaderChecksum(const uint8_t *packet, size_t len) {
   return ChecksumCarry(sum);
 }
 
-uint16_t TCPChecksum(const uint8_t *packet, size_t len) {}
+uint16_t TCPChecksum(const uint8_t *packet, size_t len) {
+  size_t ip_header_len = IPHeaderLength(packet, len);
+  size_t tcp_len = len - ip_header_len;
+  const uint8_t *segment = packet + ip_header_len;
+  uint32_t sum = 0;
+  // pseudo header
+  // src/dst addr
+  sum += *reinterpret_cast<const uint16_t *>(packet + 12);
+  sum += *reinterpret_cast<const uint16_t *>(packet + 14);
+  sum += *reinterpret_cast<const uint16_t *>(packet + 16);
+  sum += *reinterpret_cast<const uint16_t *>(packet + 18);
+  // protocol & len
+  sum += 0x0600 + htons(tcp_len);
+  // tcp segment
+  for (int i = 0; i < tcp_len; i = i + 2) {
+    uint16_t x =
+        (i == 16) ? 0 : *reinterpret_cast<const uint16_t *>(segment + i);
+    sum += x;
+  }
+  if (tcp_len & 1) {
+    sum += static_cast<uint16_t>(*(segment + tcp_len + 1)) << 8;
+  }
+  return ChecksumCarry(sum);
+}
 
 uint16_t UDPChecksum(const uint8_t *packet, size_t len) {
   size_t ip_header_len = IPHeaderLength(packet, len);
