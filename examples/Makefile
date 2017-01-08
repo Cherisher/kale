@@ -3,15 +3,17 @@
 CXX := clang++
 CXXFLAGS := -Wall -g -std=c++14 -I.. -O2
 LDFLAGS := -lpthread -L.. -lkale -lsnappy -lpcap -lnet -lkl
-TARGETS := raw_tun_proxy
+OBJECTS := raw_tun_proxy.o
+TARGETS := $(patsubst %.o, %, $(OBJECTS))
 
 all: $(TARGETS)
 
 %.o: %.cc
 	$(CXX) $(CXXFLAGS) -fPIC -c $<
 
-raw_tun_proxy: raw_tun_proxy.o
+$(TARGETS): %: %.o
 	$(CXX) $(CXXFLAGS) -o $@ $< $(LDFLAGS)
+
 clean:
 	@rm -vf $(TARGETS)
 	@rm -vf *.o *.a *.so
