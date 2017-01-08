@@ -5,10 +5,18 @@
 #include <stdexcept>
 
 #include "kl/logger.h"
-#include "pcap++.h"
+#include "sniffer.h"
 
 namespace kale {
-namespace pcap {
+
+kl::Result<std::string> Sniffer::DefaultDevice() {
+  char *dev, errbuf[PCAP_ERRBUF_SIZE];
+  dev = pcap_lookupdev(errbuf);
+  if (dev == nullptr) {
+    return kl::Err("Couldn't find default device: %s\n", errbuf);
+  }
+  return kl::Ok(std::string(dev));
+}
 
 Sniffer::Sniffer(const char *ifname) : ifname_(ifname), handle_(nullptr) {
   char dev[IFNAMSIZ];
@@ -72,5 +80,4 @@ void Sniffer::BreakLoop() { return pcap_breakloop(handle_); }
 
 Sniffer::~Sniffer() { Close(); }
 
-}  // namespace pcap
 }  // namespace kale

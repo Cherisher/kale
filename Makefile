@@ -12,7 +12,7 @@ CXX := clang++
 CXXFLAGS := -Wall -g -std=c++14 -I$(LIBPCAP) -I$(LIBNET)/libnet/include -O2
 LDFLAGS := -lpthread -L. -lkale -lsnappy -lpcap -lnet -lkl
 STATICLIB := libkale.a
-OBJECTS := tun.o pcap++.o ip_packet.o
+OBJECTS := tun.o ip_packet.o sniffer.o
 TESTS := $(patsubst %.cc, %, $(wildcard *_test.cc))
 
 all: $(STATICLIB) $(TESTS)

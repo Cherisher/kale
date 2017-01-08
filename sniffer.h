@@ -7,19 +7,10 @@
 #include "pcap/pcap.h"
 
 namespace kale {
-namespace pcap {
-
-inline kl::Result<std::string> DefaultDevice() {
-  char *dev, errbuf[PCAP_ERRBUF_SIZE];
-  dev = pcap_lookupdev(errbuf);
-  if (dev == nullptr) {
-    return kl::Err("Couldn't find default device: %s\n", errbuf);
-  }
-  return kl::Ok(std::string(dev));
-}
 
 class Sniffer {
 public:
+  static kl::Result<std::string> DefaultDevice();
   explicit Sniffer(const char *ifname);
   kl::Result<void> CompileAndInstall(const char *filter_expr);
   kl::Result<void> Loop(int count,
@@ -43,6 +34,5 @@ private:
   char errbuf_[PCAP_ERRBUF_SIZE];
 };
 
-}  // namespace pcap
 }  // namespace
 #endif

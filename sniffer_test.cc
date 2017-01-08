@@ -7,22 +7,22 @@
 #include "kl/string.h"
 #include "kl/testkit.h"
 #include "kl/udp.h"
-#include "pcap++.h"
+#include "sniffer.h"
 
 class T {};
 
 TEST(T, DefaultDevice) {
-  auto device = kale::pcap::DefaultDevice();
+  auto device = kale::Sniffer::DefaultDevice();
   ASSERT(device);
   KL_DEBUG("default device %s", (*device).c_str());
 }
 
-TEST(kale::pcap::Sniffer, Constructor, "lo") {}
+TEST(kale::Sniffer, Constructor, "lo") {}
 
 TEST(T, CompileAndInstall) {
-  auto device = kale::pcap::DefaultDevice();
+  auto device = kale::Sniffer::DefaultDevice();
   ASSERT(device);
-  kale::pcap::Sniffer sniffer((*device).c_str());
+  kale::Sniffer sniffer((*device).c_str());
   auto compile = sniffer.CompileAndInstall("udp and portrange 50000-65535");
   ASSERT(compile);
   auto fail_compile =
@@ -35,7 +35,7 @@ TEST(T, UDPDump) {
   const char *ifname = "lo";
   const uint16_t port = 4000;
   const int kNumOfPackets = 1 << 20;
-  kale::pcap::Sniffer sniffer("lo");
+  kale::Sniffer sniffer("lo");
   auto compile = sniffer.CompileAndInstall(
       kl::string::FormatString("udp and port %u", port).c_str());
   ASSERT(compile);
@@ -73,7 +73,7 @@ TEST(T, Loop) {
   const char *ifname = "lo";
   const uint16_t port = 4000;
   const int kNumOfPackets = 1 << 20;
-  kale::pcap::Sniffer sniffer("lo");
+  kale::Sniffer sniffer("lo");
   auto compile = sniffer.CompileAndInstall(
       kl::string::FormatString("udp and port %u", port).c_str());
   ASSERT(compile);
