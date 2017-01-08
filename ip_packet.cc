@@ -33,7 +33,7 @@ void ChangeDstAddr(uint8_t *packet, size_t len, uint32_t addr) {
   *reinterpret_cast<uint16_t *>(packet + 10) = checksum;
 }
 
-static uint32_t ChecksumCarry(uint32_t x) {
+uint32_t ChecksumCarry(uint32_t x) {
   x = (x >> 16) + (x & 0xffff);
   return ~(x + (x >> 16)) & 0xffff;
 }

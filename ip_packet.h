@@ -18,6 +18,7 @@ void ChangeUDPPort(uint8_t *segment, size_t len, uint16_t port);
 void ChangeTCPPort(uint8_t *segment, size_t len, uint16_t port);
 
 // @return: in network byte order
+uint32_t ChecksumCarry(uint32_t x);
 uint16_t IPHeaderChecksum(const uint8_t *packet, size_t len);
 uint16_t TCPChecksum(const uint8_t *packet, size_t len);
 uint16_t UDPChecksum(const uint8_t *packet, size_t len);
