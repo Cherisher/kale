@@ -66,6 +66,8 @@ TEST(T, ReadWriteTun) {
         int nread = ::read(*sock, buf, sizeof(buf));
         ASSERT(nread >= 0);
         KL_DEBUG("read %d bytes", nread);
+        buf[nread] = 0;
+        ASSERT(std::string(buf) == message);
       });
   char buf[65536];
   KL_DEBUG("waiting for traffic...");
