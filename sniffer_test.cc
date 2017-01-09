@@ -40,7 +40,7 @@ TEST(T, UDPDump) {
       kl::string::FormatString("udp and port %u", port).c_str());
   ASSERT(compile);
   auto send_thread = std::thread([ifname, port, message] {
-    auto addr = kl::netdev::GetAddress(ifname);
+    auto addr = kl::netdev::GetAddr(ifname);
     ASSERT(addr);
     KL_DEBUG("address %s", (*addr).c_str());
     auto sock = kl::udp::Socket();
@@ -78,7 +78,7 @@ TEST(T, Loop) {
       kl::string::FormatString("udp and port %u", port).c_str());
   ASSERT(compile);
   auto send_thread = std::thread([ifname, port, &message, &sniffer] {
-    auto addr = kl::netdev::GetAddress(ifname);
+    auto addr = kl::netdev::GetAddr(ifname);
     ASSERT(addr);
     KL_DEBUG("address %s", (*addr).c_str());
     auto sock = kl::udp::Socket();
