@@ -13,8 +13,6 @@ extern const char *kTunDevRoot;
 
 // RETURN: fd
 kl::Result<int> AllocateTun(const char *ifname);
-kl::Result<int> AllocateTunInterface(const char *ifname, const char *addr,
-                                     const char *dstaddr, const char *mask);
 std::string RandomTunName();
 
 kl::Result<int> RawIPv4Socket();

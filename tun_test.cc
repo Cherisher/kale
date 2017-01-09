@@ -31,36 +31,42 @@ TEST(T, Allocation) {
   ::close(*alloc);
 }
 
-TEST(T, UDPTun) {
+TEST(T, ReadWriteTun) {
   const std::string message("imfao|wtf|rofl~~|rekt");
+  const char *ifname = "tun23";
   const char *addr = "10.0.0.1";
-  const char *dstaddr = "10.0.0.2";
-  const char *mask = "255.255.255.255";
+  const char *dst_addr = "10.0.0.2";
+  const char *mask = "255.255.255.0";
   uint16_t port = 4000;
-  auto tun_if = kale::AllocateTunInterface("tun23", addr, dstaddr, mask);
+  uint16_t dst_port = 3000;
+  auto tun_if = kale::AllocateTun(ifname);
   ASSERT(tun_if);
   int tun_fd = *tun_if;
   kl::env::Defer defer([fd = tun_fd] { ::close(fd); });
-  ASSERT(kl::netdev::InterfaceUp("tun23"));
-  auto add_route = kl::netdev::AddRoute("tun23", addr, mask);
-  if (!add_route) {
-    KL_DEBUG(add_route.Err().ToCString());
-  }
-  ASSERT(add_route);
-  auto send_thread = std::thread([addr, port, message, dstaddr] {
-    auto sock = kl::udp::Socket();
-    ASSERT(sock);
-    kl::env::Defer defer([fd = *sock] { ::close(fd); });
-    auto bind = kl::inet::Bind(*sock, addr, port);
-    if (!bind) {
-      KL_DEBUG(bind.Err().ToCString());
-    }
-    ASSERT(bind);
-    auto send = kl::inet::Sendto(*sock, message.c_str(), message.size(), 0,
-                                 dstaddr, 80);
-    ASSERT(send);
-    KL_DEBUG("send %d bytes", *send);
-  });
+  // ASSERT(kl::env::SetNonBlocking(tun_fd));
+  ASSERT(kl::netdev::InterfaceUp(ifname));
+  ASSERT(kl::netdev::SetAddr(ifname, addr));
+  ASSERT(kl::netdev::SetNetMask(ifname, mask));
+  auto send_thread =
+      std::thread([addr, port, message, ifname, dst_addr, dst_port] {
+        auto sock = kl::udp::Socket();
+        ASSERT(sock);
+        kl::env::Defer defer([fd = *sock] { ::close(fd); });
+        auto bind_if = kl::netdev::BindInterface(*sock, ifname);
+        if (!bind_if) {
+          KL_DEBUG(bind_if.Err().ToCString());
+        }
+        auto bind = kl::inet::Bind(*sock, addr, port);
+        ASSERT(bind);
+        auto send = kl::inet::Sendto(*sock, message.c_str(), message.size(), 0,
+                                     dst_addr, dst_port);
+        ASSERT(send);
+        KL_DEBUG("delivered %d bytes", *send);
+        char buf[65536];
+        int nread = ::read(*sock, buf, sizeof(buf));
+        ASSERT(nread >= 0);
+        KL_DEBUG("read %d bytes", nread);
+      });
   char buf[65536];
   KL_DEBUG("waiting for traffic...");
   int nread = ::read(tun_fd, buf, sizeof(buf));
@@ -79,11 +85,12 @@ TEST(T, UDPTun) {
          kale::ip_packet::IPHeaderChecksum(
              reinterpret_cast<const uint8_t *>(buf), nread));
   // udp check sum
-  const uint8_t *segment = reinterpret_cast<const uint8_t *>(
+  uint8_t *segment = reinterpret_cast<uint8_t *>(
       buf + kale::ip_packet::IPHeaderLength(
                 reinterpret_cast<const uint8_t *>(buf), nread));
-  ASSERT(ntohs(*reinterpret_cast<const uint16_t *>(segment)) == port);
-  ASSERT(ntohs(*reinterpret_cast<const uint16_t *>(segment + 2)) == 80);
+  KL_DEBUG("src port %u", ntohs(*reinterpret_cast<const uint16_t *>(segment)));
+  KL_DEBUG("dst port %u",
+           ntohs(*reinterpret_cast<const uint16_t *>(segment + 2)));
   uint16_t checksum = *reinterpret_cast<const uint16_t *>(segment + 6);
   KL_DEBUG("udp actual checksum: %u", checksum);
   KL_DEBUG("udp checksum calculated: %u",
@@ -93,6 +100,22 @@ TEST(T, UDPTun) {
                          reinterpret_cast<const uint8_t *>(buf), nread));
   buf[nread] = '\0';
   ASSERT(std::string(buf + 28) == message);
+  // swap src/dst
+  uint8_t *packet = reinterpret_cast<uint8_t *>(buf);
+  uint32_t tmp_addr = *reinterpret_cast<uint32_t *>(packet + 12);
+  *reinterpret_cast<uint32_t *>(packet + 12) =
+      *reinterpret_cast<uint32_t *>(packet + 16);
+  *reinterpret_cast<uint32_t *>(packet + 16) = tmp_addr;
+  uint16_t tmp_port = *reinterpret_cast<uint16_t *>(segment);
+  *reinterpret_cast<uint16_t *>(segment) =
+      *reinterpret_cast<uint16_t *>(segment + 2);
+  *reinterpret_cast<uint16_t *>(segment + 2) = tmp_port;
+  kale::ip_packet::UDPFillChecksum(packet, nread);
+  kale::ip_packet::IPFillChecksum(packet, nread);
+  KL_DEBUG("writing to tun");
+  int nwrite = ::write(tun_fd, buf, nread);
+  KL_DEBUG("write %d bytes", nwrite);
+  ASSERT(nwrite == nread);
   send_thread.join();
 }
 
