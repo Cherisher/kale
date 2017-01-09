@@ -14,6 +14,7 @@
 #include "kl/epoll.h"
 #include "kl/inet.h"
 #include "kl/logger.h"
+#include "kl/rwlock.h"
 #include "kl/tcp.h"
 #include "kl/udp.h"
 #include "kl/wait_group.h"
@@ -95,8 +96,7 @@ static void IPPacket(int datalink, struct pcap_pkthdr *header,
 }
 
 static int RunIt(const char *ifname, const char *host, uint16_t port,
-                 uint16_t port_min, uint16_t port_max, const char *peer_host,
-                 uint16_t peer_port) {
+                 uint16_t port_min, uint16_t port_max) {
   char filter_expr[256];
   std::snprintf(filter_expr, sizeof(filter_expr),
                 "(udp or tcp)"
@@ -116,6 +116,7 @@ static int RunIt(const char *ifname, const char *host, uint16_t port,
     return 1;
   }
   int udp_fd = *udp_sock;
+  kl::env::Defer defer([fd = udp_fd] { ::close(fd); });
   auto udp_bind = kl::inet::Bind(udp_fd, host, port);
   if (!udp_bind) {
     KL_ERROR(udp_bind.Err().ToCString());
@@ -128,11 +129,14 @@ static int RunIt(const char *ifname, const char *host, uint16_t port,
     return 1;
   }
   // threads to run epoll and sniffer
+  kl::rwlock::Lock rwlock;
+  std::string peer_host;
+  uint16_t peer_port;
   std::atomic<bool> stop(false);
   kl::WaitGroup wg;
   // sniffer thread
   wg.Add();
-  std::thread([&sniffer, &wg, &stop, udp_fd, peer_host, peer_port] {
+  std::thread([&sniffer, &wg, &stop, udp_fd, &rwlock, &peer_host, &peer_port] {
     kl::env::Defer defer([&wg, &stop] {
       stop.store(true);
       wg.Done();
@@ -191,8 +195,10 @@ static int RunIt(const char *ifname, const char *host, uint16_t port,
       size_t n = snappy::Compress(reinterpret_cast<const char *>(packet), len,
                                   &compress);
       (void)n;
+      rwlock.RLock();
       auto send = kl::inet::Sendto(udp_fd, compress.data(), compress.size(), 0,
-                                   peer_host, peer_port);
+                                   peer_host.c_str(), peer_port);
+      rwlock.RUnlock();
       if (!send) {
         KL_ERROR(send.Err().ToCString());
       }
@@ -200,7 +206,8 @@ static int RunIt(const char *ifname, const char *host, uint16_t port,
   }).detach();
   // epoll thread
   wg.Add();
-  std::thread([&wg, &stop, &epoll, udp_fd, host, port_min, port_max] {
+  std::thread([&wg, &stop, &epoll, udp_fd, host, port_min, port_max, &rwlock,
+               &peer_host, &peer_port] {
     kl::env::Defer defer([&wg, &stop] {
       stop.store(true);
       wg.Done();
@@ -222,23 +229,35 @@ static int RunIt(const char *ifname, const char *host, uint16_t port,
       }
       for (const auto &event : *wait) {
         int fd = event.data.fd;
+        assert(fd == udp_fd);
         uint32_t events = event.events;
         if (events & EPOLLIN) {
           while (true) {
-            int nread = ::read(fd, buf, sizeof(buf));
-            if (nread < 0) {
-              if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            auto recv = kl::inet::RecvFrom(fd, buf, sizeof(buf), 0);
+            if (!recv) {
+              if (recv.Err().Code() == EAGAIN ||
+                  recv.Err().Code() == EWOULDBLOCK) {
                 break;
               }
-              KL_ERROR(std::strerror(errno));
+              KL_ERROR(recv.Err().ToCString());
               return;
             }
+            int nread = std::get<0>(*recv);
             // NAT and forward using raw_fd
             std::string uncompress;
             bool ok = snappy::Uncompress(buf, nread, &uncompress);
             if (!ok) {
               KL_ERROR("failed to uncompress buf");
               continue;
+            }
+            // change peer's addr
+            std::string &new_host = std::get<1>(*recv);
+            uint16_t new_port = std::get<2>(*recv);
+            if (!(new_host == peer_host && new_port == peer_port)) {
+              rwlock.WLock();
+              peer_host = new_host;
+              peer_port = new_port;
+              rwlock.WUnlock();
             }
             assert(uncompress.size() <= sizeof(buf));
             ::memcpy(buf, uncompress.data(), uncompress.size());
@@ -354,9 +373,7 @@ static kl::Result<void> BindPorts(FdManager *fd_manager, const char *host,
 int main(int argc, char *argv[]) {
   std::string ifname("eth0");  // -i
   std::string host("0.0.0.0");
-  uint16_t port = 4000;  // -l
-  std::string peer_host;
-  uint16_t peer_port = 0;                       // -p
+  uint16_t port = 4000;                         // -l
   uint16_t port_min = 60000, port_max = 60255;  // -r
   int opt = 0;
   while ((opt = ::getopt(argc, argv, "i:l:r:p:h")) != -1) {
@@ -368,11 +385,6 @@ int main(int argc, char *argv[]) {
       }
       case 'l': {
         auto split = kl::inet::SplitAddr(optarg, &host, &port);
-        assert(split);
-        break;
-      }
-      case 'p': {
-        auto split = kl::inet::SplitAddr(optarg, &peer_host, &peer_port);
         assert(split);
         break;
       }
@@ -396,6 +408,5 @@ int main(int argc, char *argv[]) {
     KL_ERROR(bind_range.Err().ToCString());
   }
   // TODO(Kai Luo): use iptables to drop packets towards these ports
-  return RunIt(ifname.c_str(), host.c_str(), port, port_min, port_max,
-               peer_host.c_str(), peer_port);
+  return RunIt(ifname.c_str(), host.c_str(), port, port_min, port_max);
 }
