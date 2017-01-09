@@ -1,6 +1,8 @@
 // Copyright (c) 2017 Kai Luo <gluokai@gmail.com>. All rights reserved.
 #include <arpa/inet.h>
 
+#include <iostream>
+
 #include "ip_packet.h"
 #include "kl/logger.h"
 
@@ -31,19 +33,23 @@ uint32_t DstAddr(const uint8_t *packet, size_t len) {
 }
 
 uint16_t TCPSrcPort(const uint8_t *packet, size_t len) {
-  return *reinterpret_cast<const uint16_t *>(packet);
+  const uint8_t *segment = SegmentBase(packet, len);
+  return *reinterpret_cast<const uint16_t *>(segment);
 }
 
 uint16_t TCPDstPort(const uint8_t *packet, size_t len) {
-  return *reinterpret_cast<const uint16_t *>(packet + 2);
+  const uint8_t *segment = SegmentBase(packet, len);
+  return *reinterpret_cast<const uint16_t *>(segment + 2);
 }
 
 uint16_t UDPSrcPort(const uint8_t *packet, size_t len) {
-  return *reinterpret_cast<const uint16_t *>(packet);
+  const uint8_t *segment = SegmentBase(packet, len);
+  return *reinterpret_cast<const uint16_t *>(segment);
 }
 
 uint16_t UDPDstPort(const uint8_t *packet, size_t len) {
-  return *reinterpret_cast<const uint16_t *>(packet + 2);
+  const uint8_t *segment = SegmentBase(packet, len);
+  return *reinterpret_cast<const uint16_t *>(segment + 2);
 }
 
 void ChangeSrcAddr(uint8_t *packet, size_t len, uint32_t addr) {
@@ -58,6 +64,10 @@ void IPFillChecksum(uint8_t *packet, size_t len) {
   *reinterpret_cast<uint16_t *>(packet + 10) = IPHeaderChecksum(packet, len);
 }
 
+const uint8_t *SegmentBase(const uint8_t *packet, size_t len) {
+  return packet + IPHeaderLength(packet, len);
+}
+
 uint8_t *SegmentBase(uint8_t *packet, size_t len) {
   return packet + IPHeaderLength(packet, len);
 }
@@ -68,11 +78,13 @@ void UDPFillChecksum(uint8_t *packet, size_t len) {
 }
 
 void ChangeUDPSrcPort(uint8_t *packet, size_t len, uint16_t port) {
-  *reinterpret_cast<uint16_t *>(packet) = port;
+  uint8_t *segment = SegmentBase(packet, len);
+  *reinterpret_cast<uint16_t *>(segment) = port;
 }
 
 void ChangeUDPDstPort(uint8_t *packet, size_t len, uint16_t port) {
-  *reinterpret_cast<uint16_t *>(packet + 2) = port;
+  uint8_t *segment = SegmentBase(packet, len);
+  *reinterpret_cast<uint16_t *>(segment + 2) = port;
 }
 
 void TCPFillChecksum(uint8_t *packet, size_t len) {
@@ -81,11 +93,13 @@ void TCPFillChecksum(uint8_t *packet, size_t len) {
 }
 
 void ChangeTCPSrcPort(uint8_t *packet, size_t len, uint16_t port) {
-  *reinterpret_cast<uint16_t *>(packet) = port;
+  uint8_t *segment = SegmentBase(packet, len);
+  *reinterpret_cast<uint16_t *>(segment) = port;
 }
 
 void ChangeTCPDstPort(uint8_t *packet, size_t len, uint16_t port) {
-  *reinterpret_cast<uint16_t *>(packet + 2) = port;
+  uint8_t *segment = SegmentBase(packet, len);
+  *reinterpret_cast<uint16_t *>(segment + 2) = port;
 }
 
 uint32_t ChecksumCarry(uint32_t x) {
@@ -156,6 +170,19 @@ uint16_t UDPChecksum(const uint8_t *packet, size_t len) {
     sum += static_cast<uint16_t>(*(segment + udp_len + 1)) << 8;
   }
   return ChecksumCarry(sum);
+}
+
+void Dump(FILE *out, const uint8_t *packet, size_t len) {
+  for (size_t i = 0; i < len; ++i) {
+    fprintf(out, "%02x", *(packet + i));
+    if (((i + 1) & 15) == 0) {
+      fprintf(out, "\n");
+    } else if (i & 1) {
+      fprintf(out, " ");
+    }
+  }
+  fprintf(out, "\n");
+  fflush(out);
 }
 
 }  // namespace ip_packet

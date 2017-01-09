@@ -25,6 +25,7 @@ void ChangeUDPDstPort(uint8_t *packet, size_t len, uint16_t port);
 void ChangeTCPSrcPort(uint8_t *packet, size_t len, uint16_t port);
 void ChangeTCPDstPort(uint8_t *packet, size_t len, uint16_t port);
 uint8_t *SegmentBase(uint8_t *packet, size_t len);
+const uint8_t *SegmentBase(const uint8_t *packet, size_t len);
 void IPFillChecksum(uint8_t *packet, size_t len);
 void UDPFillChecksum(uint8_t *packet, size_t len);
 void TCPFillChecksum(uint8_t *packet, size_t len);
@@ -35,6 +36,8 @@ uint32_t ChecksumCarry(uint32_t x);
 uint16_t IPHeaderChecksum(const uint8_t *packet, size_t len);
 uint16_t TCPChecksum(const uint8_t *packet, size_t len);
 uint16_t UDPChecksum(const uint8_t *packet, size_t len);
+
+void Dump(FILE *out, const uint8_t *packet, size_t len);
 
 }  // namespace packet
 }  // namespace kale
