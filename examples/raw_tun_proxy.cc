@@ -27,7 +27,10 @@ void PrintUsage(int argc, char *argv[]) {
 }
 
 static kl::Result<ssize_t> WriteTun(int tun_fd, const char *buf, int len) {
-  ssize_t nwrite = ::write(tun_fd, buf, len);
+  std::string uncompress;
+  size_t n = snappy::Uncompress(buf, len, &uncompress);
+  KL_DEBUG("origin len %d, uncompressed len %d", len, n);
+  ssize_t nwrite = ::write(tun_fd, uncompress.data(), uncompress.size());
   if (nwrite < 0) {
     return kl::Err(errno, std::strerror(errno));
   }
@@ -62,7 +65,7 @@ static int RunIt(const std::string &remote_host, uint16_t remote_port,
   epoll.AddFd(tun_fd, EPOLLET | EPOLLIN);
   epoll.AddFd(udp_fd, EPOLLET | EPOLLIN);
   while (true) {
-    auto wait = epoll.Wait(4, -1);
+    auto wait = epoll.Wait(2, -1);
     if (!wait) {
       KL_ERROR(wait.Err().ToCString());
       return 1;
