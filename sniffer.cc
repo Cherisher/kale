@@ -29,7 +29,10 @@ Sniffer::Sniffer(const char *ifname) : ifname_(ifname), handle_(nullptr) {
   if (handle_ == nullptr) {
     throw std::runtime_error(errbuf_);
   }
+  data_link_ = pcap_datalink(handle_);
 }
+
+int Sniffer::DataLink() const { return data_link_; }
 
 void Sniffer::Close() {
   if (handle_) {
