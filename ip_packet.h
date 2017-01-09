@@ -12,6 +12,12 @@ bool IsTCP(const uint8_t *packet, size_t len);
 uint16_t IPHeaderLength(const uint8_t *packet, size_t len);
 
 // @addr, @port in network byte order.
+uint32_t SrcAddr(const uint8_t *packet, size_t len);
+uint32_t DstAddr(const uint8_t *packet, size_t len);
+uint16_t UDPSrcPort(const uint8_t *packet, size_t len);
+uint16_t UDPDstPort(const uint8_t *packet, size_t len);
+uint16_t TCPSrcPort(const uint8_t *packet, size_t len);
+uint16_t TCPDstPort(const uint8_t *packet, size_t len);
 void ChangeSrcAddr(uint8_t *packet, size_t len, uint32_t addr);
 void ChangeDstAddr(uint8_t *packet, size_t len, uint32_t addr);
 void ChangeUDPSrcPort(uint8_t *packet, size_t len, uint16_t port);

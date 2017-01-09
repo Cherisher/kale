@@ -22,6 +22,30 @@ bool IsTCP(const uint8_t *packet, size_t len) {
   return packet[9] == 0x06;
 }
 
+uint32_t SrcAddr(const uint8_t *packet, size_t len) {
+  return *reinterpret_cast<const uint32_t *>(packet + 12);
+}
+
+uint32_t DstAddr(const uint8_t *packet, size_t len) {
+  return *reinterpret_cast<const uint32_t *>(packet + 16);
+}
+
+uint16_t TCPSrcPort(const uint8_t *packet, size_t len) {
+  return *reinterpret_cast<const uint16_t *>(packet);
+}
+
+uint16_t TCPDstPort(const uint8_t *packet, size_t len) {
+  return *reinterpret_cast<const uint16_t *>(packet + 2);
+}
+
+uint16_t UDPSrcPort(const uint8_t *packet, size_t len) {
+  return *reinterpret_cast<const uint16_t *>(packet);
+}
+
+uint16_t UDPDstPort(const uint8_t *packet, size_t len) {
+  return *reinterpret_cast<const uint16_t *>(packet + 2);
+}
+
 void ChangeSrcAddr(uint8_t *packet, size_t len, uint32_t addr) {
   *reinterpret_cast<uint32_t *>(packet + 12) = addr;
 }
