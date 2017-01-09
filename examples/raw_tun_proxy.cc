@@ -16,6 +16,8 @@
 #include "snappy/snappy.h"
 #include "tun.h"
 
+static uint16_t kMTU = 1380;
+
 static void PrintUsage(int argc, char *argv[]) {
   std::fprintf(stderr, "%s:\n"
                        "    -r <remote_host:remote_port>\n"
@@ -28,8 +30,10 @@ static void PrintUsage(int argc, char *argv[]) {
 
 static kl::Result<ssize_t> WriteTun(int tun_fd, const char *buf, int len) {
   std::string uncompress;
-  size_t n = snappy::Uncompress(buf, len, &uncompress);
-  KL_DEBUG("origin len %d, uncompressed len %d", len, n);
+  bool ok = snappy::Uncompress(buf, len, &uncompress);
+  if (!ok) {
+    return kl::Err("failed to uncompress buf");
+  }
   ssize_t nwrite = ::write(tun_fd, uncompress.data(), uncompress.size());
   if (nwrite < 0) {
     return kl::Err(errno, std::strerror(errno));
@@ -180,6 +184,11 @@ int main(int argc, char *argv[]) {
   auto set_nb = kl::env::SetNonBlocking(*tun_if);
   if (!set_nb) {
     std::fprintf(stderr, "%s\n", set_nb.Err().ToCString());
+    ::exit(1);
+  }
+  auto set_mtu = kl::netdev::SetMTU(tun_name.c_str(), kMTU);
+  if (!set_mtu) {
+    std::fprintf(stderr, "%s\n", set_mtu.Err().ToCString());
     ::exit(1);
   }
   auto if_up = kl::netdev::InterfaceUp(tun_name.c_str());
