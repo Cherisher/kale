@@ -34,10 +34,22 @@ static kl::Result<ssize_t> WriteTun(int tun_fd, const char *buf, int len) {
   if (!ok) {
     return kl::Err("failed to uncompress buf");
   }
+  assert(kale::ip_packet::IsTCP(
+      reinterpret_cast<const uint8_t *>(uncompress.data()), uncompress.size()));
+  KL_DEBUG("dst host: %s:%u",
+           inet_ntoa(in_addr{
+               .s_addr = kale::ip_packet::DstAddr(
+                   reinterpret_cast<const uint8_t *>(uncompress.data()),
+                   uncompress.size()),
+           }),
+           ntohs(kale::ip_packet::TCPDstPort(
+               reinterpret_cast<const uint8_t *>(uncompress.data()),
+               uncompress.size())));
   ssize_t nwrite = ::write(tun_fd, uncompress.data(), uncompress.size());
   if (nwrite < 0) {
     return kl::Err(errno, std::strerror(errno));
   }
+  assert(nwrite == uncompress.size());
   return kl::Ok(nwrite);
 }
 
@@ -87,15 +99,18 @@ static int RunIt(const std::string &remote_host, uint16_t remote_port,
             KL_ERROR(std::strerror(errno));
             return 1;
           }
-          KL_DEBUG("read %d bytes", nread);
-          if (kale::ip_packet::IsUDP(reinterpret_cast<const uint8_t *>(buf),
-                                     nread)) {
-            KL_DEBUG("udp protocol");
-          } else if (kale::ip_packet::IsTCP(reinterpret_cast<uint8_t *>(buf),
-                                            nread)) {
-            KL_DEBUG("tcp protocol");
-          }
           if (fd == tun_fd) {
+            if (kale::ip_packet::IsTCP(reinterpret_cast<const uint8_t *>(buf),
+                                       nread)) {
+              KL_DEBUG("origin checksum %u",
+                       *reinterpret_cast<uint16_t *>(
+                           kale::ip_packet::SegmentBase(
+                               reinterpret_cast<uint8_t *>(buf), nread) +
+                           16));
+              KL_DEBUG("checksum calculated %u",
+                       kale::ip_packet::TCPChecksum(
+                           reinterpret_cast<const uint8_t *>(buf), nread));
+            }
             auto write =
                 WriteInet(udp_fd, buf, nread, remote_host.c_str(), remote_port);
             if (!write) {
@@ -103,6 +118,7 @@ static int RunIt(const std::string &remote_host, uint16_t remote_port,
               return 1;
             }
           } else if (fd == udp_fd) {
+            KL_DEBUG("packet compressed len: %d", nread);
             auto write = WriteTun(tun_fd, buf, nread);
             if (!write) {
               KL_ERROR(write.Err().ToCString());

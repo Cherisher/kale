@@ -102,6 +102,7 @@ static int RunIt(const char *ifname, const char *host, uint16_t port,
                 "(udp or tcp)"
                 " and host %s and dst portrange %u-%u",
                 host, port_min, port_max);
+  KL_DEBUG("filter_expr: %s", filter_expr);
   // sniffer to monitor traffic to port_min-port_max
   kale::Sniffer sniffer(ifname);
   auto compile = sniffer.CompileAndInstall(filter_expr);
@@ -172,9 +173,11 @@ static int RunIt(const char *ifname, const char *host, uint16_t port,
         }
         kl::inet::SplitAddr(tcp_port_to_host[port].c_str(), &dst_host,
                             &dst_port);
+        KL_DEBUG("send packet back to %s:%u", dst_host.c_str(), dst_port);
         addr = *kl::inet::InetSockAddr(dst_host.c_str(), dst_port);
         kale::ip_packet::ChangeDstAddr(packet, len, addr.sin_addr.s_addr);
-        kale::ip_packet::ChangeTCPDstPort(packet, len, addr.sin_port);
+        kale::ip_packet::ChangeTCPDstPort(packet, len, htons(dst_port));
+        assert(kale::ip_packet::TCPDstPort(packet, len) != 0);
         kale::ip_packet::TCPFillChecksum(packet, len);
         kale::ip_packet::IPFillChecksum(packet, len);
       } else if (kale::ip_packet::IsUDP(packet, len)) {
@@ -196,6 +199,7 @@ static int RunIt(const char *ifname, const char *host, uint16_t port,
                                   &compress);
       (void)n;
       rwlock.RLock();
+      KL_DEBUG("peer host: %s:%u", peer_host.c_str(), peer_port);
       auto send = kl::inet::Sendto(udp_fd, compress.data(), compress.size(), 0,
                                    peer_host.c_str(), peer_port);
       rwlock.RUnlock();
@@ -262,7 +266,9 @@ static int RunIt(const char *ifname, const char *host, uint16_t port,
             assert(uncompress.size() <= sizeof(buf));
             ::memcpy(buf, uncompress.data(), uncompress.size());
             uint8_t *packet = reinterpret_cast<uint8_t *>(buf);
-            size_t len = uncompress.size();
+            const size_t len = uncompress.size();
+            // std::fprintf(stderr, "before handle\n");
+            // kale::ip_packet::Dump(stderr, packet, len);
             if (kale::ip_packet::IsTCP(packet, len)) {
               uint16_t port = ntohs(kale::ip_packet::TCPSrcPort(packet, len));
               struct in_addr in {
@@ -270,6 +276,7 @@ static int RunIt(const char *ifname, const char *host, uint16_t port,
               };
               std::string s =
                   kl::string::FormatString("%s:%u", inet_ntoa(in), port);
+              KL_DEBUG("packet from %s", s.c_str());
               int local_port = -1;
               if (!tcp_host_to_port.count(s)) {
                 local_port = AllocateTCPPort(port_min, port_max);
@@ -288,10 +295,15 @@ static int RunIt(const char *ifname, const char *host, uint16_t port,
               kale::ip_packet::ChangeTCPSrcPort(packet, len, htons(local_port));
               kale::ip_packet::TCPFillChecksum(packet, len);
               kale::ip_packet::IPFillChecksum(packet, len);
-              int nwrite = ::write(raw_fd, packet, len);
-              if (nwrite < 0) {
-                KL_ERROR(std::strerror(errno));
-                continue;
+              in.s_addr = kale::ip_packet::DstAddr(packet, len);
+              KL_DEBUG("packet sent to %s:%u", inet_ntoa(in),
+                       ntohs(kale::ip_packet::TCPDstPort(packet, len)));
+              // std::fprintf(stderr, "after handle\n");
+              // kale::ip_packet::Dump(stderr, packet, len);
+              auto send =
+                  kl::inet::Sendto(raw_fd, packet, len, 0, inet_ntoa(in), 0);
+              if (!send) {
+                KL_ERROR(send.Err().ToCString());
               }
             } else if (kale::ip_packet::IsUDP(packet, len)) {
               uint16_t port = ntohs(kale::ip_packet::UDPSrcPort(packet, len));
