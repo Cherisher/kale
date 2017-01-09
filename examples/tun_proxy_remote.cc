@@ -359,11 +359,29 @@ int main(int argc, char *argv[]) {
   uint16_t peer_port = 0;                       // -p
   uint16_t port_min = 60000, port_max = 60255;  // -r
   int opt = 0;
-  while ((opt = ::getopt(argc, argv, "i:l:r:h")) != -1) {
+  while ((opt = ::getopt(argc, argv, "i:l:r:p:h")) != -1) {
     // TODO(Kai Luo): Commandline parse
     switch (opt) {
       case 'i': {
         ifname = optarg;
+        break;
+      }
+      case 'l': {
+        auto split = kl::inet::SplitAddr(optarg, &host, &port);
+        assert(split);
+        break;
+      }
+      case 'p': {
+        auto split = kl::inet::SplitAddr(optarg, &peer_host, &peer_port);
+        assert(split);
+        break;
+      }
+      case 'r': {
+        auto split = kl::string::SplitString(optarg, ":");
+        assert(split.size() == 2);
+        port_min = atoi(split[0].c_str());
+        port_max = atoi(split[1].c_str());
+        assert(port_min <= port_max);
         break;
       }
       case 'h':
