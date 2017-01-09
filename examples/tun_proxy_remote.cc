@@ -23,6 +23,7 @@
 static std::map<uint16_t, std::tuple<std::string, uint16_t>> udp_port_to_host;
 static std::map<uint16_t, std::tuple<std::string, uint16_t>> tcp_port_to_host;
 
+namespace {
 class FdManager {
 public:
   void AddFd(int fd) {
@@ -39,6 +40,7 @@ public:
 private:
   std::set<int> set_;
 };
+}
 
 static int RunIt(const char *ifname, const char *host, uint16_t port,
                  uint16_t port_min, uint16_t port_max) {
