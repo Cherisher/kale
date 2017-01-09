@@ -51,6 +51,9 @@ private:
 
 static int AllocateUDPPort(uint16_t port_min, uint16_t port_max) {
   int n = udp_port_allocator.SetFirstZeroBit();
+  if (n < 0) {
+    return n;
+  }
   if (n + port_min > port_max) {
     udp_port_allocator.Clear(n);
     return -1;
@@ -60,6 +63,9 @@ static int AllocateUDPPort(uint16_t port_min, uint16_t port_max) {
 
 static int AllocateTCPPort(uint16_t port_min, uint16_t port_max) {
   int n = tcp_port_allocator.SetFirstZeroBit();
+  if (n < 0) {
+    return n;
+  }
   if (n + port_min > port_max) {
     tcp_port_allocator.Clear(n);
     return -1;
@@ -227,7 +233,7 @@ static int RunIt(const char *ifname, const char *host, uint16_t port,
               KL_ERROR(std::strerror(errno));
               return;
             }
-            // TODO(Kai Luo): NAT and forward using raw_fd
+            // NAT and forward using raw_fd
             std::string uncompress;
             bool ok = snappy::Uncompress(buf, nread, &uncompress);
             if (!ok) {
