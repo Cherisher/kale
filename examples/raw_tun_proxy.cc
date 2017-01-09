@@ -16,7 +16,7 @@
 #include "snappy/snappy.h"
 #include "tun.h"
 
-void PrintUsage(int argc, char *argv[]) {
+static void PrintUsage(int argc, char *argv[]) {
   std::fprintf(stderr, "%s:\n"
                        "    -r <remote_host:remote_port>\n"
                        "    -t <tun_name>\n"
