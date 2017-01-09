@@ -4,7 +4,7 @@ LIBPCAP := ../libpcap
 CXX := clang++
 CXXFLAGS := -Wall -g -std=c++14 -I.. -I$(LIBPCAP) -O2
 LDFLAGS := -lpthread -L.. -lkale -lsnappy -lpcap -lnet -lkl
-OBJECTS := raw_tun_proxy.o raw_tun_proxy_remote.o
+OBJECTS := raw_tun_proxy.o tun_proxy_remote.o
 TARGETS := $(patsubst %.o, %, $(OBJECTS))
 
 all: $(TARGETS)
