@@ -200,16 +200,6 @@ int main(int argc, char *argv[]) {
     std::fprintf(stderr, "%s\n", set_nb.Err().ToCString());
     ::exit(1);
   }
-  auto set_mtu = kl::netdev::SetMTU(tun_name.c_str(), kMTU);
-  if (!set_mtu) {
-    std::fprintf(stderr, "%s\n", set_mtu.Err().ToCString());
-    ::exit(1);
-  }
-  auto if_up = kl::netdev::InterfaceUp(tun_name.c_str());
-  if (!if_up) {
-    std::fprintf(stderr, "%s\n", if_up.Err().ToCString());
-    ::exit(1);
-  }
   auto set_addr = kl::netdev::SetAddr(tun_name.c_str(), tun_addr.c_str());
   if (!set_addr) {
     std::fprintf(stderr, "%s\n", set_addr.Err().ToCString());
@@ -220,11 +210,15 @@ int main(int argc, char *argv[]) {
     std::fprintf(stderr, "%s\n", set_mask.Err().ToCString());
     ::exit(1);
   }
-  // auto add_route = kl::netdev::AddRoute(tun_name.c_str(), tun_addr.c_str(),
-  //                                       tun_mask.c_str());
-  // if (!add_route) {
-  //   std::fprintf(stderr, "%s\n", add_route.Err().ToCString());
-  //   ::exit(1);
-  // }
+  auto set_mtu = kl::netdev::SetMTU(tun_name.c_str(), kMTU);
+  if (!set_mtu) {
+    std::fprintf(stderr, "%s\n", set_mtu.Err().ToCString());
+    ::exit(1);
+  }
+  auto if_up = kl::netdev::InterfaceUp(tun_name.c_str());
+  if (!if_up) {
+    std::fprintf(stderr, "%s\n", if_up.Err().ToCString());
+    ::exit(1);
+  }
   return RunIt(remote_host, remote_port, *tun_if);
 }
