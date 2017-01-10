@@ -144,11 +144,11 @@ static int RunIt(const std::string &remote_host, uint16_t remote_port,
 
 int main(int argc, char *argv[]) {
   std::string remote_host;
-  uint16_t remote_port = 0;                 // -r
-  std::string tun_name("tun0");             // -t
-  std::string tun_addr("10.0.0.1");         // -a
-  std::string tun_dstaddr("10.0.0.2");      // -d
-  std::string tun_mask("255.255.255.255");  // -m
+  uint16_t remote_port = 0;               // -r
+  std::string tun_name("tun0");           // -t
+  std::string tun_addr("10.0.0.1");       // -a
+  std::string tun_dstaddr("10.0.0.2");    // -d
+  std::string tun_mask("255.255.255.0");  // -m
   int opt = 0;
   while ((opt = ::getopt(argc, argv, "r:t:a:d:m:h")) != -1) {
     switch (opt) {
@@ -189,9 +189,7 @@ int main(int argc, char *argv[]) {
     PrintUsage(argc, argv);
     ::exit(1);
   }
-  auto tun_if =
-      kale::AllocateTunInterface(tun_name.c_str(), tun_addr.c_str(),
-                                 tun_dstaddr.c_str(), tun_mask.c_str());
+  auto tun_if = kale::AllocateTun(tun_name.c_str());
   if (!tun_if) {
     std::fprintf(stderr, "%s\n", tun_if.Err().ToCString());
     ::exit(1);
@@ -212,11 +210,21 @@ int main(int argc, char *argv[]) {
     std::fprintf(stderr, "%s\n", if_up.Err().ToCString());
     ::exit(1);
   }
-  auto add_route = kl::netdev::AddRoute(tun_name.c_str(), tun_addr.c_str(),
-                                        tun_mask.c_str());
-  if (!add_route) {
-    std::fprintf(stderr, "%s\n", add_route.Err().ToCString());
+  auto set_addr = kl::netdev::SetAddr(tun_name.c_str(), tun_addr.c_str());
+  if (!set_addr) {
+    std::fprintf(stderr, "%s\n", set_addr.Err().ToCString());
     ::exit(1);
   }
+  auto set_mask = kl::netdev::SetNetMask(tun_name.c_str(), tun_mask.c_str());
+  if (!set_mask) {
+    std::fprintf(stderr, "%s\n", set_mask.Err().ToCString());
+    ::exit(1);
+  }
+  // auto add_route = kl::netdev::AddRoute(tun_name.c_str(), tun_addr.c_str(),
+  //                                       tun_mask.c_str());
+  // if (!add_route) {
+  //   std::fprintf(stderr, "%s\n", add_route.Err().ToCString());
+  //   ::exit(1);
+  // }
   return RunIt(remote_host, remote_port, *tun_if);
 }
