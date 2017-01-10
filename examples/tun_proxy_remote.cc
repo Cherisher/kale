@@ -42,7 +42,7 @@ private:
 const char *kHostAddrFormat = "%s:%u:%s:%u";
 
 // Tow Level NAT
-// <peer_addr>:<tun_subnet_addr> -> local_port
+// <peer_addr>:<subnet_addr> -> local_port
 // local_port -> <peer_addr>:<subnet_addr>
 class NAT {
 public:
