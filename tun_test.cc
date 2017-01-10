@@ -33,9 +33,9 @@ TEST(T, Allocation) {
 
 TEST(T, ReadWriteTun) {
   const std::string message("imfao|wtf|rofl~~|rekt");
-  const char *ifname = "tun23";
-  const char *addr = "10.0.0.1";
-  const char *dst_addr = "10.0.0.2";
+  const char *ifname = "tun0";
+  const char *addr = "10.0.0.10";
+  const char *dst_addr = "123.125.114.144";
   const char *mask = "255.255.255.0";
   uint16_t port = 4000;
   uint16_t dst_port = 3000;
@@ -47,6 +47,7 @@ TEST(T, ReadWriteTun) {
   ASSERT(kl::netdev::InterfaceUp(ifname));
   ASSERT(kl::netdev::SetAddr(ifname, addr));
   ASSERT(kl::netdev::SetNetMask(ifname, mask));
+  ASSERT(kl::netdev::AddRoute(ifname, dst_addr, mask));
   auto send_thread =
       std::thread([addr, port, message, ifname, dst_addr, dst_port] {
         auto sock = kl::udp::Socket();
@@ -56,8 +57,6 @@ TEST(T, ReadWriteTun) {
         if (!bind_if) {
           KL_DEBUG(bind_if.Err().ToCString());
         }
-        auto bind = kl::inet::Bind(*sock, addr, port);
-        ASSERT(bind);
         auto send = kl::inet::Sendto(*sock, message.c_str(), message.size(), 0,
                                      dst_addr, dst_port);
         ASSERT(send);
