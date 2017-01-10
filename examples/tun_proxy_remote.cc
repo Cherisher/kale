@@ -249,7 +249,7 @@ private:
                       uint8_t *packet, size_t len);
   void EpollHandleUDP(const char *peer_addr, uint16_t peer_port,
                       uint8_t *packet, size_t len);
-  void OnUDPRecvFromClient();
+  void OnUDPRecvFromPeer();
 
   void Stop() { stop_.store(true); }
 
@@ -270,7 +270,7 @@ private:
   kale::Sniffer sniffer_;
   kl::WaitGroup sync_;
   kl::Epoll epoll_;
-  // Used to communicate with upstream client
+  // Used to communicate with peer
   int udp_fd_;
   // Used to send IPv4 packets to inet host
   int raw_fd_;
@@ -356,7 +356,7 @@ void Proxy::EpollHandleUDP(const char *peer_addr, uint16_t peer_port,
   }
 }
 
-void Proxy::OnUDPRecvFromClient() {
+void Proxy::OnUDPRecvFromPeer() {
   // read until EAGAIN or EWOULDBLOCK
   char buf[65536];
   while (true) {
@@ -406,7 +406,7 @@ void Proxy::EpollWaitAndHandle() {
   assert(fd == udp_fd_);
   uint32_t events = event.events;
   if (events & EPOLLIN) {
-    OnUDPRecvFromClient();
+    OnUDPRecvFromPeer();
   }
   if (events & EPOLLERR) {
     int error = 0;
