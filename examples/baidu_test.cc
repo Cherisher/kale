@@ -13,10 +13,12 @@ int main() {
   assert(tcp_sock);
   int fd = *tcp_sock;
   kl::env::Defer defer([fd] { ::close(fd); });
-  auto bind = kl::netdev::BindInterface(fd, "tun0");
-  if (!bind) {
-    std::cerr << bind.Err().ToCString() << std::endl;
+  auto bind_if = kl::netdev::BindInterface(fd, "tun0");
+  if (!bind_if) {
+    std::cerr << bind_if.Err().ToCString() << std::endl;
   }
+  assert(bind_if);
+  auto bind = kl::inet::Bind(fd, "10.0.0.1", 4000);
   assert(bind);
   auto connect = kl::inet::BlockingConnect(fd, "123.125.114.144", 80);
   assert(connect);
