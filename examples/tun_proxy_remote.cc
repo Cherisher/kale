@@ -287,6 +287,8 @@ void Proxy::EpollHandleTCP(const char *peer_addr, uint16_t peer_port,
       return;
     }
     port = *add;
+  } else {
+    port = *query;
   }
   assert(port > 0);
   kale::ip_packet::ChangeSrcAddr(packet, len, in_addr_.s_addr);
