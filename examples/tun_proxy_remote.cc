@@ -273,16 +273,16 @@ private:
 
 void Proxy::EpollHandleTCP(const char *peer_addr, uint16_t peer_port,
                            uint8_t *packet, size_t len) {
-  const char *subnet_addr = inet_ntoa(in_addr{
+  std::string subnet_addr(inet_ntoa(in_addr{
       .s_addr = kale::ip_packet::SrcAddr(packet, len),
-  });
+  }));
   uint16_t subnet_port = ntohs(kale::ip_packet::TCPSrcPort(packet, len));
-  auto query =
-      tcp_nat_.QueryPort(peer_addr, peer_port, subnet_addr, subnet_port);
+  auto query = tcp_nat_.QueryPort(peer_addr, peer_port, subnet_addr.c_str(),
+                                  subnet_port);
   uint16_t port = 0;
   if (!query) {
-    auto add =
-        tcp_nat_.AddEntry(peer_addr, peer_port, subnet_addr, subnet_port);
+    auto add = tcp_nat_.AddEntry(peer_addr, peer_port, subnet_addr.c_str(),
+                                 subnet_port);
     if (!add) {
       return;
     }
@@ -295,15 +295,17 @@ void Proxy::EpollHandleTCP(const char *peer_addr, uint16_t peer_port,
   kale::ip_packet::ChangeTCPSrcPort(packet, len, htons(port));
   kale::ip_packet::TCPFillChecksum(packet, len);
   kale::ip_packet::IPFillChecksum(packet, len);
-  const char *dst_addr = inet_ntoa(in_addr{
+  std::string dst_addr(inet_ntoa(in_addr{
       .s_addr = kale::ip_packet::DstAddr(packet, len),
-  });
+  }));
   uint16_t dst_port = ntohs(kale::ip_packet::TCPDstPort(packet, len));
   KL_DEBUG("tcp segment from host %s:%u's subnet  %s:%u -> %s:%u now is %s:%u "
            "-> %s:%u",
-           peer_addr, peer_port, subnet_addr, subnet_port, dst_addr, dst_port,
-           addr_.c_str(), port, dst_addr, dst_port);
-  auto send = kl::inet::Sendto(raw_fd_, packet, len, 0, dst_addr, dst_port);
+           peer_addr, peer_port, subnet_addr.c_str(), subnet_port,
+           dst_addr.c_str(), dst_port, addr_.c_str(), port, dst_addr.c_str(),
+           dst_port);
+  auto send =
+      kl::inet::Sendto(raw_fd_, packet, len, 0, dst_addr.c_str(), dst_port);
   if (!send) {
     KL_ERROR(send.Err().ToCString());
   }
@@ -311,16 +313,16 @@ void Proxy::EpollHandleTCP(const char *peer_addr, uint16_t peer_port,
 
 void Proxy::EpollHandleUDP(const char *peer_addr, uint16_t peer_port,
                            uint8_t *packet, size_t len) {
-  const char *subnet_addr = inet_ntoa(in_addr{
+  std::string subnet_addr(inet_ntoa(in_addr{
       .s_addr = kale::ip_packet::SrcAddr(packet, len),
-  });
+  }));
   uint16_t subnet_port = ntohs(kale::ip_packet::UDPSrcPort(packet, len));
-  auto query =
-      udp_nat_.QueryPort(peer_addr, peer_port, subnet_addr, subnet_port);
+  auto query = udp_nat_.QueryPort(peer_addr, peer_port, subnet_addr.c_str(),
+                                  subnet_port);
   uint16_t port = 0;
   if (!query) {
-    auto add =
-        udp_nat_.AddEntry(peer_addr, peer_port, subnet_addr, subnet_port);
+    auto add = udp_nat_.AddEntry(peer_addr, peer_port, subnet_addr.c_str(),
+                                 subnet_port);
     if (!add) {
       return;
     }
@@ -331,15 +333,17 @@ void Proxy::EpollHandleUDP(const char *peer_addr, uint16_t peer_port,
   kale::ip_packet::ChangeUDPSrcPort(packet, len, htons(port));
   kale::ip_packet::UDPFillChecksum(packet, len);
   kale::ip_packet::IPFillChecksum(packet, len);
-  const char *dst_addr = inet_ntoa(in_addr{
+  std::string dst_addr(inet_ntoa(in_addr{
       .s_addr = kale::ip_packet::DstAddr(packet, len),
-  });
+  }));
   uint16_t dst_port = ntohs(kale::ip_packet::UDPDstPort(packet, len));
   KL_DEBUG("udp segment from host %s:%u's subnet  %s:%u -> %s:%u now is %s:%u "
            "-> %s:%u",
-           peer_addr, peer_port, subnet_addr, subnet_port, dst_addr, dst_port,
-           addr_.c_str(), port, dst_addr, dst_port);
-  auto send = kl::inet::Sendto(raw_fd_, packet, len, 0, dst_addr, dst_port);
+           peer_addr, peer_port, subnet_addr.c_str(), subnet_port,
+           dst_addr.c_str(), dst_port, addr_.c_str(), port, dst_addr.c_str(),
+           dst_port);
+  auto send =
+      kl::inet::Sendto(raw_fd_, packet, len, 0, dst_addr.c_str(), dst_port);
   if (!send) {
     KL_ERROR(send.Err().ToCString());
   }
