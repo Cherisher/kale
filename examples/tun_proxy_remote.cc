@@ -220,6 +220,11 @@ private:
     }).detach();
   }
 
+  void Stop(const char *err) {
+    stop_.store(true);
+    SetExitReason(err);
+  }
+
   void LaunchEpollThread() {
     sync_.Add();
     std::thread([this] {
@@ -361,7 +366,7 @@ void Proxy::OnUDPRecvFromClient() {
         break;
       }
       KL_ERROR(recv.Err().ToCString());
-      Stop();
+      Stop(recv.Err().ToCString());
       return;
     }
     // TODO(Kai Luo): Implement a snappy::Sink to reduce copy
@@ -392,7 +397,7 @@ void Proxy::EpollWaitAndHandle() {
   auto wait = epoll_.Wait(1, -1);
   if (!wait) {
     KL_ERROR(wait.Err().ToCString());
-    Stop();
+    Stop(wait.Err().ToCString());
     return;
   }
   assert((*wait).size() == 1);
