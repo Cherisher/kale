@@ -88,17 +88,6 @@ static int RunIt(const std::string &remote_host, uint16_t remote_port,
             return 1;
           }
           if (fd == tun_fd) {
-            if (kale::ip_packet::IsTCP(reinterpret_cast<const uint8_t *>(buf),
-                                       nread)) {
-              KL_DEBUG("origin checksum %u",
-                       *reinterpret_cast<uint16_t *>(
-                           kale::ip_packet::SegmentBase(
-                               reinterpret_cast<uint8_t *>(buf), nread) +
-                           16));
-              KL_DEBUG("checksum calculated %u",
-                       kale::ip_packet::TCPChecksum(
-                           reinterpret_cast<const uint8_t *>(buf), nread));
-            }
             auto write =
                 WriteInet(udp_fd, buf, nread, remote_host.c_str(), remote_port);
             if (!write) {
