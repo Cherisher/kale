@@ -48,7 +48,7 @@ static kl::Result<ssize_t> WriteTun(int tun_fd, const char *buf, int len) {
   if (nwrite < 0) {
     return kl::Err(errno, std::strerror(errno));
   }
-  assert(nwrite == uncompress.size());
+  assert(nwrite == static_cast<ssize_t>(uncompress.size()));
   return kl::Ok(nwrite);
 }
 
