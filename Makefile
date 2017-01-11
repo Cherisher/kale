@@ -8,8 +8,8 @@ LIBPCAP := libpcap
 LIBPCAP_LIB := libpcap.a
 LIBNET := libnet
 LIBNET_LIB := libnet.a
-CXX := clang++
-CXXFLAGS := -Wall -g -std=c++14 -I$(LIBPCAP) -I$(LIBNET)/libnet/include -O2
+CXX := g++
+CXXFLAGS := -Wall -Werror -g -std=c++14 -I$(LIBPCAP) -I$(LIBNET)/libnet/include -O2
 LDFLAGS := -lpthread -L. -lkale -lsnappy -lpcap -lnet -lkl
 STATICLIB := libkale.a
 OBJECTS := tun.o ip_packet.o sniffer.o
