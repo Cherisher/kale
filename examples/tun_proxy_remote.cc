@@ -220,6 +220,7 @@ private:
                     addr_.c_str(), port_min_, port_max_);
       auto compile = sniffer_.CompileAndInstall(filter_expr);
       if (!compile) {
+        KL_ERROR(compile.Err().ToCString());
         Stop(compile.Err().ToCString());
         return;
       }
