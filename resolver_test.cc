@@ -35,7 +35,7 @@ TEST(T, Query) {
   ASSERT(udp_sock);
   int fd = *udp_sock;
   kale::Resolver resovler(fd);
-  auto query = resovler.Query("www.google.com", "8.8.8.8", 53);
+  auto query = resovler.SendQuery("www.google.com", "8.8.8.8", 53);
   ASSERT(query);
 }
 
