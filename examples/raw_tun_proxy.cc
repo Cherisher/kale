@@ -81,8 +81,16 @@ RawTunProxy::RawTunProxy(const char *ifname, const char *addr, const char *mask,
 }
 
 int RawTunProxy::Run() {
-  kl::env::SetNonBlocking(udp_fd_);
-  kl::env::SetNonBlocking(tun_fd_);
+  auto set_nb = kl::env::SetNonBlocking(udp_fd_);
+  if (!set_nb) {
+    KL_ERROR("set udp_fd_ failed, %s", set_nb.Err().ToCString());
+    return 1;
+  }
+  set_nb = kl::env::SetNonBlocking(tun_fd_);
+  if (!set_nb) {
+    KL_ERROR("set tun_fd_ failed, %s", set_nb.Err().ToCString());
+    return 1;
+  }
   auto add_udp = epoll_.AddFd(udp_fd_, EPOLLET | EPOLLIN);
   if (!add_udp) {
     KL_ERROR(add_udp.Err().ToCString());
