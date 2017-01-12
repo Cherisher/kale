@@ -6,8 +6,6 @@
 #include "kl/netdev.h"
 #include "kl/tcp.h"
 
-static const char *GET = "GET / HTTP/1.1\r\n\r\n";
-
 int main() {
   const char *ifname = "tun0";
   const char *dst_addr = "123.125.114.144";
