@@ -14,6 +14,7 @@
 #include "kl/epoll.h"
 #include "kl/inet.h"
 #include "kl/logger.h"
+#include "kl/random.h"
 #include "kl/rwlock.h"
 #include "kl/tcp.h"
 #include "kl/udp.h"
@@ -21,6 +22,8 @@
 #include "snappy/snappy.h"
 #include "sniffer.h"
 #include "tun.h"
+
+namespace {
 
 class FdManager {
 public:
@@ -117,11 +120,15 @@ private:
   int AllocatePort() {
     int n = bitset_.SetFirstZeroBit();
     if (n < 0) {
-      return n;
+      // FIXME(Kai Luo): use lru to replace random
+      return port_min_ +
+             (port_max_ - port_min_) * kl::random::UniformSampleFloat();
     }
     if (n + port_min_ > port_max_) {
       bitset_.Clear(n);
-      return -1;
+      // FIXME(Kai Luo): use lru to replace random
+      return port_min_ +
+             (port_max_ - port_min_) * kl::random::UniformSampleFloat();
     }
     return n + port_min_;
   }
@@ -135,9 +142,9 @@ class Proxy {
 public:
   Proxy(const char *ifname, const char *local_addr, uint16_t local_port,
         uint16_t port_min, uint16_t port_max)
-      : stop_(false), ifname_(ifname), addr_(local_addr), port_(local_port),
-        udp_nat_(port_min, port_max), tcp_nat_(port_min, port_max),
-        sniffer_(ifname) {
+      : stop_(false), ifname_(ifname), addr_(local_addr), port_min_(port_min),
+        port_max_(port_max), port_(local_port), udp_nat_(port_min, port_max),
+        tcp_nat_(port_min, port_max), sniffer_(ifname) {
     inet_aton(addr_.c_str(), &in_addr_);
   }
 
@@ -214,6 +221,16 @@ private:
         stop_.store(true);
         sync_.Done();
       });
+      char filter_expr[1024];
+      std::snprintf(filter_expr, sizeof(filter_expr),
+                    "(udp or tcp) and host %s and dst portrange %u-%u",
+                    addr_.c_str(), port_min_, port_max_);
+      auto compile = sniffer_.CompileAndInstall(filter_expr);
+      if (!compile) {
+        KL_ERROR(compile.Err().ToCString());
+        Stop(compile.Err().ToCString());
+        return;
+      }
       while (!stop_) {
         SnifferWaitAndHandle();
       }
@@ -264,6 +281,7 @@ private:
   std::mutex mutex_;
   std::atomic<bool> stop_;
   std::string ifname_, addr_, exit_reason_;
+  uint16_t port_min_, port_max_;
   struct in_addr in_addr_;
   uint16_t port_;
   NAT udp_nat_, tcp_nat_;
@@ -543,6 +561,7 @@ kl::Result<void> BindPortRange(FdManager *fd_manager, const char *host,
   }
   return kl::Ok();
 }
+}  // namespace (anonymous)
 
 int main(int argc, char *argv[]) {
   std::string ifname("eth0");  // -i

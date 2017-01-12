@@ -219,7 +219,7 @@ int BuildNetworkBuffer(uint8_t *buf, size_t size, const char *format,
         str_len = -1;
       }
     }
-    if (ch == '#' && *format != 0 && *format == 's') {
+    if (ch == '#' && *format == 's') {
       str_len = va_arg(args, int);
     }
     if (ch == 's') {
@@ -260,7 +260,6 @@ int BuildNetworkBuffer(uint8_t *buf, size_t size, const char *format,
 int BuildNetworkBuffer(uint8_t *buf, size_t size, const char *fmt, ...) {
   va_list args;
   int len;
-
   va_start(args, fmt);
   len = BuildNetworkBuffer(buf, size, fmt, args);
   va_end(args);

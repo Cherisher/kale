@@ -16,7 +16,184 @@
 #include "snappy/snappy.h"
 #include "tun.h"
 
-static uint16_t kMTU = 1380;
+namespace {
+class RawTunProxy {
+public:
+  RawTunProxy(const char *ifname, const char *addr, const char *mask,
+              uint16_t mtu, const char *remote_host, uint16_t remote_port);
+
+  int Run();
+  ~RawTunProxy() {
+    if (tun_fd_ >= 0) {
+      ::close(tun_fd_);
+    }
+    if (udp_fd_ >= 0) {
+      ::close(udp_fd_);
+    }
+  }
+
+private:
+  int EpollLoop();
+  kl::Result<void> HandleTUN();
+  kl::Result<void> HandleUDP();
+  std::string ifname_, addr_, mask_;
+  uint16_t mtu_;
+  std::string remote_host_;
+  uint16_t remote_port_;
+  int tun_fd_, udp_fd_;
+  kl::Epoll epoll_;
+};
+
+RawTunProxy::RawTunProxy(const char *ifname, const char *addr, const char *mask,
+                         uint16_t mtu, const char *remote_host,
+                         uint16_t remote_port)
+    : ifname_(ifname), addr_(addr), mask_(mask), mtu_(mtu),
+      remote_host_(remote_host), remote_port_(remote_port), tun_fd_(-1),
+      udp_fd_(-1) {
+  auto alloc_tun = kale::AllocateTun(ifname);
+  if (!alloc_tun) {
+    throw std::runtime_error(alloc_tun.Err().ToCString());
+  }
+  tun_fd_ = *alloc_tun;
+  assert(tun_fd_ >= 0);
+  auto set_addr = kl::netdev::SetAddr(ifname, addr);
+  if (!set_addr) {
+    throw std::runtime_error(set_addr.Err().ToCString());
+  }
+  auto set_mask = kl::netdev::SetNetMask(ifname, mask);
+  if (!set_mask) {
+    throw std::runtime_error(set_mask.Err().ToCString());
+  }
+  auto set_mtu = kl::netdev::SetMTU(ifname, mtu);
+  if (!set_mtu) {
+    throw std::runtime_error(set_mtu.Err().ToCString());
+  }
+  auto if_up = kl::netdev::InterfaceUp(ifname);
+  if (!if_up) {
+    throw std::runtime_error(if_up.Err().ToCString());
+  }
+  auto udp = kl::udp::Socket();
+  if (!udp) {
+    throw std::runtime_error(udp.Err().ToCString());
+  }
+  udp_fd_ = *udp;
+  assert(udp_fd_ >= 0);
+}
+
+int RawTunProxy::Run() {
+  auto set_nb = kl::env::SetNonBlocking(udp_fd_);
+  if (!set_nb) {
+    KL_ERROR("set udp_fd_ failed, %s", set_nb.Err().ToCString());
+    return 1;
+  }
+  set_nb = kl::env::SetNonBlocking(tun_fd_);
+  if (!set_nb) {
+    KL_ERROR("set tun_fd_ failed, %s", set_nb.Err().ToCString());
+    return 1;
+  }
+  auto add_udp = epoll_.AddFd(udp_fd_, EPOLLET | EPOLLIN);
+  if (!add_udp) {
+    KL_ERROR(add_udp.Err().ToCString());
+    return 1;
+  }
+  auto add_tun = epoll_.AddFd(tun_fd_, EPOLLET | EPOLLIN);
+  if (!add_tun) {
+    KL_ERROR(add_tun.Err().ToCString());
+    return 1;
+  }
+  return EpollLoop();
+}
+
+kl::Result<void> RawTunProxy::HandleTUN() {
+  char buf[65536];
+  while (true) {
+    int nread = ::read(tun_fd_, buf, sizeof(buf));
+    if (nread < 0) {
+      if (errno != EAGAIN && errno != EWOULDBLOCK) {
+        return kl::Err(errno, std::strerror(errno));
+      }
+      break;
+    }
+    std::string compress;
+    snappy::Compress(buf, nread, &compress);
+    auto send = kl::inet::Sendto(udp_fd_, compress.data(), compress.size(), 0,
+                                 remote_host_.c_str(), remote_port_);
+    if (!send) {
+      return kl::Err(send.MoveErr());
+    }
+    KL_DEBUG("send %d bytes to %s:%u", *send, remote_host_.c_str(),
+             remote_port_);
+  }
+  return kl::Ok();
+}
+
+kl::Result<void> RawTunProxy::HandleUDP() {
+  char buf[65536];
+  while (true) {
+    int nread = ::read(udp_fd_, buf, sizeof(buf));
+    if (nread < 0) {
+      if (errno != EAGAIN && errno != EWOULDBLOCK) {
+        return kl::Err(errno, std::strerror(errno));
+      }
+      break;
+    }
+    std::string uncompress;
+    bool ok = snappy::Uncompress(buf, nread, &uncompress);
+    if (!ok) {
+      KL_DEBUG("failed to uncompress from buf");
+      // just ignore it
+      continue;
+    }
+    int nwrite = ::write(tun_fd_, uncompress.data(), uncompress.size());
+    if (nwrite < 0) {
+      return kl::Err(errno, std::strerror(errno));
+    }
+    KL_DEBUG("write %d bytes back to tun", nwrite);
+  }
+  return kl::Ok();
+}
+
+int RawTunProxy::EpollLoop() {
+  while (true) {
+    auto wait = epoll_.Wait(2, -1);
+    if (!wait) {
+      KL_ERROR(wait.Err().ToCString());
+      return 1;
+    }
+    for (const auto &event : *wait) {
+      int fd = event.data.fd;
+      uint32_t events = event.events;
+      if (events & EPOLLERR) {
+        int error = 0;
+        socklen_t len = sizeof(error);
+        if (::getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &len) == 0) {
+          KL_ERROR(std::strerror(error));
+        } else {
+          KL_ERROR("EPOLLERR");
+        }
+        return 1;
+      }
+      assert(events & EPOLLIN);
+      if (fd == udp_fd_) {
+        KL_DEBUG("udp_fd_'s EPOLLIN");
+        auto ok = HandleUDP();
+        if (!ok) {
+          KL_ERROR(ok.Err().ToCString());
+          return ok.Err().Code();
+        }
+      }
+      if (fd == tun_fd_) {
+        auto ok = HandleTUN();
+        if (!ok) {
+          KL_ERROR(ok.Err().ToCString());
+          return ok.Err().Code();
+        }
+      }
+    }
+  }
+}
+
+}  // namespace (anonymous)
 
 static void PrintUsage(int argc, char *argv[]) {
   std::fprintf(stderr, "%s:\n"
@@ -27,115 +204,13 @@ static void PrintUsage(int argc, char *argv[]) {
                argv[0]);
 }
 
-static kl::Result<ssize_t> WriteTun(int tun_fd, const char *buf, int len) {
-  std::string uncompress;
-  bool ok = snappy::Uncompress(buf, len, &uncompress);
-  if (!ok) {
-    return kl::Err("failed to uncompress buf");
-  }
-  ssize_t nwrite = ::write(tun_fd, uncompress.data(), uncompress.size());
-  if (nwrite < 0) {
-    return kl::Err(errno, std::strerror(errno));
-  }
-  assert(nwrite == static_cast<ssize_t>(uncompress.size()));
-  return kl::Ok(nwrite);
-}
-
-static kl::Result<ssize_t> WriteInet(int udp_fd, const char *buf, int len,
-                                     const char *host, uint16_t port) {
-  std::string compress;
-  size_t n = snappy::Compress(buf, len, &compress);
-  KL_DEBUG("origin len %d, compressed len %d", len, n);
-  return kl::inet::Sendto(udp_fd, compress.data(), compress.size(), 0, host,
-                          port);
-}
-
-static int RunIt(const std::string &remote_host, uint16_t remote_port,
-                 int tun_fd) {
-  auto udp_sock = kl::udp::Socket();
-  if (!udp_sock) {
-    KL_ERROR(udp_sock.Err().ToCString());
-    return 1;
-  }
-  int udp_fd = *udp_sock;
-  kl::env::Defer defer([fd = udp_fd] { ::close(fd); });
-  auto set_nb = kl::env::SetNonBlocking(udp_fd);
-  if (!set_nb) {
-    KL_ERROR(set_nb.Err().ToCString());
-    return 1;
-  }
-  char buf[65536];
-  kl::Epoll epoll;
-  epoll.AddFd(tun_fd, EPOLLET | EPOLLIN);
-  epoll.AddFd(udp_fd, EPOLLET | EPOLLIN);
-  while (true) {
-    auto wait = epoll.Wait(2, -1);
-    if (!wait) {
-      KL_ERROR(wait.Err().ToCString());
-      return 1;
-    }
-    for (const auto &event : *wait) {
-      int fd = event.data.fd;
-      if (event.events & EPOLLIN) {
-        // read until EAGAIN or EWOULDBLOCK
-        while (true) {
-          int nread = ::read(fd, buf, sizeof(buf));
-          if (nread < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-              break;
-            }
-            KL_ERROR(std::strerror(errno));
-            return 1;
-          }
-          if (fd == tun_fd) {
-            if (kale::ip_packet::IsTCP(reinterpret_cast<const uint8_t *>(buf),
-                                       nread)) {
-              KL_DEBUG("origin checksum %u",
-                       *reinterpret_cast<uint16_t *>(
-                           kale::ip_packet::SegmentBase(
-                               reinterpret_cast<uint8_t *>(buf), nread) +
-                           16));
-              KL_DEBUG("checksum calculated %u",
-                       kale::ip_packet::TCPChecksum(
-                           reinterpret_cast<const uint8_t *>(buf), nread));
-            }
-            auto write =
-                WriteInet(udp_fd, buf, nread, remote_host.c_str(), remote_port);
-            if (!write) {
-              KL_ERROR(write.Err().ToCString());
-              return 1;
-            }
-          } else if (fd == udp_fd) {
-            KL_DEBUG("packet compressed len: %d", nread);
-            auto write = WriteTun(tun_fd, buf, nread);
-            if (!write) {
-              KL_ERROR(write.Err().ToCString());
-              return 1;
-            }
-          }
-        }  // end while
-      }    // end EPOLLIN handle
-      if (event.events & EPOLLERR) {
-        int error = 0;
-        socklen_t len = sizeof(error);
-        if (::getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &len) == 0) {
-          KL_ERROR(std::strerror(error));
-        } else {
-          KL_ERROR("EPOLLERR");
-        }
-        return 1;
-      }
-    }
-  }
-  return 0;
-}
-
 int main(int argc, char *argv[]) {
   std::string remote_host;
   uint16_t remote_port = 0;               // -r
   std::string tun_name("tun0");           // -i
   std::string tun_addr("10.0.0.1");       // -a
   std::string tun_mask("255.255.255.0");  // -m
+  uint16_t tun_mtu = 1380;
   int opt = 0;
   while ((opt = ::getopt(argc, argv, "r:t:a:d:m:h")) != -1) {
     switch (opt) {
@@ -171,36 +246,7 @@ int main(int argc, char *argv[]) {
     PrintUsage(argc, argv);
     ::exit(1);
   }
-  auto tun_if = kale::AllocateTun(tun_name.c_str());
-  if (!tun_if) {
-    std::fprintf(stderr, "%s\n", tun_if.Err().ToCString());
-    ::exit(1);
-  }
-  kl::env::Defer defer([fd = *tun_if] { ::close(fd); });
-  auto set_nb = kl::env::SetNonBlocking(*tun_if);
-  if (!set_nb) {
-    std::fprintf(stderr, "%s\n", set_nb.Err().ToCString());
-    ::exit(1);
-  }
-  auto set_addr = kl::netdev::SetAddr(tun_name.c_str(), tun_addr.c_str());
-  if (!set_addr) {
-    std::fprintf(stderr, "%s\n", set_addr.Err().ToCString());
-    ::exit(1);
-  }
-  auto set_mask = kl::netdev::SetNetMask(tun_name.c_str(), tun_mask.c_str());
-  if (!set_mask) {
-    std::fprintf(stderr, "%s\n", set_mask.Err().ToCString());
-    ::exit(1);
-  }
-  auto set_mtu = kl::netdev::SetMTU(tun_name.c_str(), kMTU);
-  if (!set_mtu) {
-    std::fprintf(stderr, "%s\n", set_mtu.Err().ToCString());
-    ::exit(1);
-  }
-  auto if_up = kl::netdev::InterfaceUp(tun_name.c_str());
-  if (!if_up) {
-    std::fprintf(stderr, "%s\n", if_up.Err().ToCString());
-    ::exit(1);
-  }
-  return RunIt(remote_host, remote_port, *tun_if);
+  RawTunProxy proxy(tun_name.c_str(), tun_addr.c_str(), tun_mask.c_str(),
+                    tun_mtu, remote_host.c_str(), remote_port);
+  return proxy.Run();
 }

@@ -1,6 +1,6 @@
 [submodule "kl"]
 	path = kl
-	url = git://github.com/bzEq/kl.git
+        url = git@git.coding.net:rsgah/kl.git
         ignore = dirty
 [submodule "snappy"]
 	path = snappy
