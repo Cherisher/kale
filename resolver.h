@@ -20,7 +20,7 @@ public:
 
 private:
   int fd_;
-  uint16_t transaction_id_;
+  std::atomic<uint16_t> transaction_id_;
 };
 
 }  // namespace kale
