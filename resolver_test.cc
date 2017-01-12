@@ -3,6 +3,7 @@
 #include "ip_packet.h"
 #include "kl/logger.h"
 #include "kl/testkit.h"
+#include "kl/udp.h"
 
 class T {};
 
@@ -27,6 +28,15 @@ TEST(T, DNSName) {
   ASSERT(len == static_cast<int>(name.size()));
   char *buf_str = reinterpret_cast<char *>(buf);
   ASSERT(name == std::string(buf_str, buf_str + len));
+}
+
+TEST(T, Query) {
+  auto udp_sock = kl::udp::Socket();
+  ASSERT(udp_sock);
+  int fd = *udp_sock;
+  kale::Resolver resovler(fd);
+  auto query = resovler.Query("www.google.com", "8.8.8.8", 53);
+  ASSERT(query);
 }
 
 int main() { return KL_TEST(); }

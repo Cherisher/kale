@@ -3,6 +3,7 @@
 #include <unistd.h>
 
 #include "ip_packet.h"
+#include "kl/inet.h"
 #include "resolver.h"
 
 namespace kale {
@@ -38,6 +39,23 @@ std::string Resolver::DNSName(const char *name) {
   assert(i == 0);
   result[i] = static_cast<char>(count);
   return result;
+}
+
+kl::Result<std::vector<std::string>>
+Resolver::Query(const char *name, const char *server, uint16_t port) {
+  auto query = BuildQuery(name, transaction_id_++);
+  auto send =
+      kl::inet::Sendto(fd_, query.data(), query.size(), 0, server, port);
+  if (!send) {
+    return kl::Err(send.MoveErr());
+  }
+  uint8_t buf[1024];
+  int nread = ::read(fd_, buf, sizeof(buf));
+  if (nread < 0) {
+    return kl::Err(errno, std::strerror(errno));
+  }
+  std::vector<std::string> result;
+  return kl::Ok(std::move(result));
 }
 
 std::vector<uint8_t> Resolver::BuildQuery(const char *name,
