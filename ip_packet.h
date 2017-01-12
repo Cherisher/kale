@@ -39,6 +39,13 @@ uint16_t UDPChecksum(const uint8_t *packet, size_t len);
 
 void Dump(FILE *out, const uint8_t *packet, size_t len);
 
+// format: ([bwq]|[[<num>|#]s])*
+// b for uint8_t, w for uint16_t, q for uint32_t, all in network byte order
+int BuildNetworkBuffer(uint8_t *buf, size_t size, const char *format, ...);
+
+int BuildNetworkBuffer(uint8_t *buf, size_t size, const char *format,
+                       va_list args);
+
 }  // namespace packet
 }  // namespace kale
 #endif

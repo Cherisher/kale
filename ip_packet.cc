@@ -150,7 +150,6 @@ uint16_t UDPChecksum(const uint8_t *packet, size_t len) {
   size_t ip_header_len = IPHeaderLength(packet, len);
   size_t udp_len = len - ip_header_len;
   const uint8_t *segment = packet + ip_header_len;
-  assert(udp_len == ntohs(*reinterpret_cast<const uint16_t *>(segment + 4)));
   uint32_t sum = 0;
   // pseudo header
   // src/dst addr
@@ -183,6 +182,89 @@ void Dump(FILE *out, const uint8_t *packet, size_t len) {
   }
   fprintf(out, "\n");
   fflush(out);
+}
+
+static void WriteBufferAt(uint8_t *buf, size_t size, int index, char c) {
+  if (buf && index < static_cast<int>(size)) {
+    buf[index] = static_cast<uint8_t>(c);
+  }
+}
+
+static void WriteBufferAt(uint8_t *buf, size_t size, int index,
+                          const char *data, int count) {
+  int i = 0;
+  while (buf && data && index < static_cast<int>(size) && i < count) {
+    buf[index++] = static_cast<uint8_t>(data[i++]);
+  }
+}
+
+// if buf == nullptr, returns the size of buffer that is required to contain the
+// whole data to be packed.
+int BuildNetworkBuffer(uint8_t *buf, size_t size, const char *format,
+                       va_list args) {
+  int result_len = 0;
+  int str_len = -1;
+  char ch = 0;
+  while ((ch = *format++) != 0) {
+    if (::isdigit(ch)) {
+      str_len = ch - '0';
+      while ((ch = *format++) != 0) {
+        if (::isdigit(ch)) {
+          str_len = (str_len * 10) + (ch - '0');
+        } else {
+          break;
+        }
+      }
+      if (ch != 's') {
+        str_len = -1;
+      }
+    }
+    if (ch == '#' && *format != 0 && *format == 's') {
+      str_len = va_arg(args, int);
+    }
+    if (ch == 's') {
+      const char *str_ptr = va_arg(args, char *);
+      if (str_len >= 0) {
+        WriteBufferAt(buf, size, result_len, str_ptr, str_len);
+        result_len += str_len;
+        str_len = -1;
+      } else {
+        while (*str_ptr) {
+          WriteBufferAt(buf, size, result_len, *str_ptr);
+          ++str_ptr;
+          ++result_len;
+        }
+      }
+    }
+    if (ch == 'b') {
+      uint8_t x = va_arg(args, int);
+      WriteBufferAt(buf, size, result_len, static_cast<char>(x));
+      ++result_len;
+    }
+    if (ch == 'w') {
+      uint16_t x = va_arg(args, int);
+      WriteBufferAt(buf, size, result_len, reinterpret_cast<const char *>(&x),
+                    sizeof(x));
+      result_len += sizeof(x);
+    }
+    if (ch == 'q') {
+      uint32_t x = va_arg(args, uint32_t);
+      WriteBufferAt(buf, size, result_len, reinterpret_cast<const char *>(&x),
+                    sizeof(x));
+      result_len += sizeof(x);
+    }
+  }
+  return result_len;
+}
+
+int BuildNetworkBuffer(uint8_t *buf, size_t size, const char *fmt, ...) {
+  va_list args;
+  int len;
+
+  va_start(args, fmt);
+  len = BuildNetworkBuffer(buf, size, fmt, args);
+  va_end(args);
+  return len;
 }
 
 }  // namespace ip_packet
