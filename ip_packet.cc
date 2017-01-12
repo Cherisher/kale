@@ -150,7 +150,6 @@ uint16_t UDPChecksum(const uint8_t *packet, size_t len) {
   size_t ip_header_len = IPHeaderLength(packet, len);
   size_t udp_len = len - ip_header_len;
   const uint8_t *segment = packet + ip_header_len;
-  assert(udp_len == ntohs(*reinterpret_cast<const uint16_t *>(segment + 4)));
   uint32_t sum = 0;
   // pseudo header
   // src/dst addr
@@ -229,6 +228,7 @@ int BuildNetworkBuffer(uint8_t *buf, size_t size, const char *format,
         while (*str_ptr) {
           WriteBufferAt(buf, size, result_len, *str_ptr);
           ++str_ptr;
+          ++result_len;
         }
       }
     }
@@ -238,13 +238,13 @@ int BuildNetworkBuffer(uint8_t *buf, size_t size, const char *format,
       ++result_len;
     }
     if (ch == 'w') {
-      uint16_t x = htons(va_arg(args, int));
+      uint16_t x = va_arg(args, int);
       WriteBufferAt(buf, size, result_len, reinterpret_cast<const char *>(&x),
                     sizeof(x));
       result_len += sizeof(x);
     }
     if (ch == 'q') {
-      uint32_t x = htons(va_arg(args, uint32_t));
+      uint32_t x = va_arg(args, uint32_t);
       WriteBufferAt(buf, size, result_len, reinterpret_cast<const char *>(&x),
                     sizeof(x));
       result_len += sizeof(x);

@@ -21,4 +21,23 @@ TEST(T, BuildNetworkBuffer0) {
   ASSERT(len == 1);
 }
 
+TEST(T, BuildNetworkBuffer1) {
+  uint8_t buf[65536];
+  uint8_t *packet = &buf[0];
+  int len;
+  len = kale::ip_packet::BuildNetworkBuffer(buf, sizeof(buf), "b", 0x11);
+  ASSERT(len == 1);
+  ASSERT(*reinterpret_cast<uint8_t *>(packet) == 0x11);
+  len = kale::ip_packet::BuildNetworkBuffer(buf, sizeof(buf), "w", 0xff00);
+  ASSERT(len == 2);
+  ASSERT(*reinterpret_cast<uint16_t *>(packet) == 0xff00);
+  len = kale::ip_packet::BuildNetworkBuffer(buf, sizeof(buf), "q", 0xaabbccdd);
+  ASSERT(len == 4);
+  ASSERT(*reinterpret_cast<uint32_t *>(packet) == 0xaabbccdd);
+  const char *message = "wtf~rekt~imfao~";
+  len = kale::ip_packet::BuildNetworkBuffer(buf, sizeof(buf), "s", message);
+  ASSERT(len == static_cast<int>(::strlen(message)));
+  ASSERT(std::string(reinterpret_cast<char *>(packet)) == message);
+}
+
 int main() { return KL_TEST(); }
