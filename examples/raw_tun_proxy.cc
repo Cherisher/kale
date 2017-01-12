@@ -33,17 +33,6 @@ static kl::Result<ssize_t> WriteTun(int tun_fd, const char *buf, int len) {
   if (!ok) {
     return kl::Err("failed to uncompress buf");
   }
-  assert(kale::ip_packet::IsTCP(
-      reinterpret_cast<const uint8_t *>(uncompress.data()), uncompress.size()));
-  KL_DEBUG("dst host: %s:%u",
-           inet_ntoa(in_addr{
-               .s_addr = kale::ip_packet::DstAddr(
-                   reinterpret_cast<const uint8_t *>(uncompress.data()),
-                   uncompress.size()),
-           }),
-           ntohs(kale::ip_packet::TCPDstPort(
-               reinterpret_cast<const uint8_t *>(uncompress.data()),
-               uncompress.size())));
   ssize_t nwrite = ::write(tun_fd, uncompress.data(), uncompress.size());
   if (nwrite < 0) {
     return kl::Err(errno, std::strerror(errno));
