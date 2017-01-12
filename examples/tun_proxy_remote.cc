@@ -14,6 +14,7 @@
 #include "kl/epoll.h"
 #include "kl/inet.h"
 #include "kl/logger.h"
+#include "kl/random.h"
 #include "kl/rwlock.h"
 #include "kl/tcp.h"
 #include "kl/udp.h"
@@ -119,11 +120,15 @@ private:
   int AllocatePort() {
     int n = bitset_.SetFirstZeroBit();
     if (n < 0) {
-      return n;
+      // FIXME(Kai Luo): use lru to replace random
+      return port_min_ +
+             (port_max_ - port_min_) * kl::random::UniformSampleFloat();
     }
     if (n + port_min_ > port_max_) {
       bitset_.Clear(n);
-      return -1;
+      // FIXME(Kai Luo): use lru to replace random
+      return port_min_ +
+             (port_max_ - port_min_) * kl::random::UniformSampleFloat();
     }
     return n + port_min_;
   }
