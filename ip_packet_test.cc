@@ -38,6 +38,13 @@ TEST(T, BuildNetworkBuffer1) {
   len = kale::ip_packet::BuildNetworkBuffer(buf, sizeof(buf), "s", message);
   ASSERT(len == static_cast<int>(::strlen(message)));
   ASSERT(std::string(reinterpret_cast<char *>(packet)) == message);
+  len = kale::ip_packet::BuildNetworkBuffer(buf, sizeof(buf), "sqwb", message,
+                                            0xaabbccdd, 0xff00, 0x11);
+  ASSERT(len == 1 + 2 + 4 + static_cast<int>(::strlen(message)));
+  len = kale::ip_packet::BuildNetworkBuffer(buf, sizeof(buf), "#s", 0, message);
+  ASSERT(len == 0);
+  len = kale::ip_packet::BuildNetworkBuffer(buf, sizeof(buf), "#s", 1, message);
+  ASSERT(len == 1);
 }
 
 int main() { return KL_TEST(); }
