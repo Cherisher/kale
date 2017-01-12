@@ -22,6 +22,8 @@
 #include "sniffer.h"
 #include "tun.h"
 
+namespace {
+
 class FdManager {
 public:
   void AddFd(int fd) {
@@ -554,6 +556,7 @@ kl::Result<void> BindPortRange(FdManager *fd_manager, const char *host,
   }
   return kl::Ok();
 }
+}  // namespace (anonymous)
 
 int main(int argc, char *argv[]) {
   std::string ifname("eth0");  // -i
