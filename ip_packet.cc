@@ -219,11 +219,15 @@ int BuildNetworkBuffer(uint8_t *buf, size_t size, const char *format,
         str_len = -1;
       }
     }
+    if (ch == '#' && *format != 0 && *format == 's') {
+      str_len = va_arg(args, int);
+    }
     if (ch == 's') {
       const char *str_ptr = va_arg(args, char *);
       if (str_len >= 0) {
         WriteBufferAt(buf, size, result_len, str_ptr, str_len);
         result_len += str_len;
+        str_len = -1;
       } else {
         while (*str_ptr) {
           WriteBufferAt(buf, size, result_len, *str_ptr);
