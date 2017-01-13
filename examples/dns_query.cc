@@ -1,4 +1,5 @@
 // Copyright (c) 2017 Kai Luo <gluokai@gmail.com>. All rights reserved.
+#include "kl/logger.h"
 #include "kl/netdev.h"
 #include "kl/udp.h"
 #include "resolver.h"
@@ -13,7 +14,10 @@ int main() {
   assert(bind_if);
   kl::netdev::AddRoute(ifname, server);
   kale::Resolver resolver(*udp);
-  auto query = resolver.SendQuery("www.google.com", server, port);
+  auto query = resolver.SendQuery("www.facebook.com", server, port);
   assert(query);
+  KL_DEBUG("local addr %s", resolver.LocalAddr().c_str());
+  auto resp = resolver.WaitForResult(*query);
+  assert(resp);
   return 0;
 }
