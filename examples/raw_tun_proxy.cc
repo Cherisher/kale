@@ -140,7 +140,7 @@ kl::Result<void> RawTunProxy::HandleUDP() {
     std::string uncompress;
     bool ok = snappy::Uncompress(buf, nread, &uncompress);
     if (!ok) {
-      KL_DEBUG("failed to uncompress from buf");
+      KL_ERROR("failed to uncompress from buf");
       // just ignore it
       continue;
     }
@@ -149,6 +149,13 @@ kl::Result<void> RawTunProxy::HandleUDP() {
       return kl::Err(errno, std::strerror(errno));
     }
     KL_DEBUG("write %d bytes back to tun", nwrite);
+    const uint8_t *packet =
+        reinterpret_cast<const uint8_t *>(uncompress.data());
+    size_t len = uncompress.size();
+    if (kale::ip_packet::IsUDP(packet, len)) {
+      KL_DEBUG("udp dst port: %u",
+               ntohs(kale::ip_packet::UDPDstPort(packet, len)));
+    }
   }
   return kl::Ok();
 }
@@ -175,7 +182,6 @@ int RawTunProxy::EpollLoop() {
       }
       assert(events & EPOLLIN);
       if (fd == udp_fd_) {
-        KL_DEBUG("udp_fd_'s EPOLLIN");
         auto ok = HandleUDP();
         if (!ok) {
           KL_ERROR(ok.Err().ToCString());
