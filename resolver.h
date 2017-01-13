@@ -16,10 +16,13 @@ public:
   kl::Result<uint16_t> SendQuery(const char *name, const char *server,
                                  uint16_t port);
   kl::Result<std::vector<std::string>> WaitForResult(uint16_t transaction_id);
+  std::string LocalAddr();
   ~Resolver();
 
 private:
   int fd_;
+  std::string addr_;
+  uint16_t port_;
   std::atomic<uint16_t> transaction_id_;
 };
 

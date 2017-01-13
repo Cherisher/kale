@@ -4,6 +4,7 @@
 
 #include "ip_packet.h"
 #include "kl/inet.h"
+#include "kl/logger.h"
 #include "resolver.h"
 
 namespace kale {
@@ -56,8 +57,25 @@ kl::Result<uint16_t> Resolver::SendQuery(const char *name, const char *server,
 // TODO(Kai Luo): implement it
 kl::Result<std::vector<std::string>>
 Resolver::WaitForResult(uint16_t transaction_id) {
+  char buf[1024];
   std::vector<std::string> result;
+  int nread = ::read(fd_, buf, sizeof(buf));
+  if (nread < 0) {
+    return kl::Err(errno, std::strerror(errno));
+  }
+  KL_DEBUG("read %d bytes", nread);
   return kl::Ok(result);
+}
+
+std::string Resolver::LocalAddr() {
+  if (addr_.empty()) {
+    auto inet_addr = kl::inet::InetAddr(fd_);
+    addr_ = std::get<0>(*inet_addr);
+    port_ = std::get<1>(*inet_addr);
+  }
+  char buf[32];
+  std::snprintf(buf, sizeof(buf), "%s:%u", addr_.c_str(), port_);
+  return std::string(buf);
 }
 
 std::vector<uint8_t> Resolver::BuildQuery(const char *name,
