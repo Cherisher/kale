@@ -36,21 +36,77 @@ Resolver::ParseResponse(const uint8_t *packet, size_t len) {
   }
   std::vector<std::string> result;
   uint16_t transaction_id = ntohs(*reinterpret_cast<const uint16_t *>(packet));
+  uint16_t question_count =
+      ntohs(*reinterpret_cast<const uint16_t *>(packet + 4));
+  // KL_DEBUG("number of questions: %u", question_count);
   uint16_t answer_count =
       ntohs(*reinterpret_cast<const uint16_t *>(packet + 6));
+  // KL_DEBUG("number of answers: %u", answer_count);
   uint16_t nameserver_count =
       ntohs(*reinterpret_cast<const uint16_t *>(packet + 8));
   uint16_t additional_count =
       ntohs(*reinterpret_cast<const uint16_t *>(packet + 10));
   const uint8_t *ptr = packet + 12;
+  for (uint16_t i = 0; i < question_count; ++i) {
+    int count = SkipDNSName(ptr);
+    ptr += count + 4;
+  }
+  std::string record;
   for (uint16_t i = 0; i < answer_count; ++i) {
+    auto count = RetrieveRecord(ptr, &record);
+    if (!count) {
+      continue;
+    }
+    ptr += *count;
+    result.push_back(std::move(record));
   }
   for (uint16_t i = 0; i < nameserver_count; ++i) {
+    auto count = RetrieveRecord(ptr, &record);
+    if (!count) {
+      continue;
+    }
+    ptr += *count;
+    result.push_back(std::move(record));
   }
   for (uint16_t i = 0; i < additional_count; ++i) {
+    auto count = RetrieveRecord(ptr, &record);
+    if (!count) {
+      continue;
+    }
+    ptr += *count;
+    result.push_back(std::move(record));
   }
-
   return kl::Ok(std::make_pair(transaction_id, std::move(result)));
+}
+
+// TODO(Kai Luo): support more type
+// Support only IN class at present
+kl::Result<int> Resolver::RetrieveRecord(const uint8_t *base,
+                                         std::string *record) {
+  const uint8_t *ptr = base;
+  // is a pointer
+  if ((*ptr & 0xc0) == 0xc0) {
+    ptr += 2;
+  } else {
+    ptr += SkipDNSName(ptr);
+  }
+  uint16_t type = ntohs(*reinterpret_cast<const uint16_t *>(ptr));
+  ptr += 2;
+  uint16_t cls = ntohs(*reinterpret_cast<const uint16_t *>(ptr));
+  if (type != 0x0001 || cls != 0x0001) {
+    return kl::Err("unimplemented type or class");
+  }
+  ptr += 2;
+  // skip ttl
+  ptr += 4;
+  uint16_t length = ntohs(*reinterpret_cast<const uint16_t *>(ptr));
+  ptr += 2;
+  assert(length == 4);
+  *record = inet_ntoa(in_addr{
+      .s_addr = *reinterpret_cast<const uint32_t *>(ptr),
+  });
+  ptr += 4;
+  return kl::Ok(static_cast<int>(ptr - base));
 }
 
 void Resolver::LaunchListenThread() {
@@ -133,6 +189,16 @@ std::string Resolver::FromDNSName(const uint8_t *base) {
     }
   }
   return std::string(tmp.data(), tmp.size());
+}
+
+int Resolver::SkipDNSName(const uint8_t *ptr) {
+  const uint8_t *base = ptr;
+  uint8_t count = *base;
+  while (count != 0) {
+    ptr += (count + 1);
+    count = *ptr;
+  }
+  return ptr - base + 1;
 }
 
 std::string Resolver::DNSName(const char *name) {

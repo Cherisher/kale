@@ -31,6 +31,9 @@ TEST(T, DNSName) {
   std::string domain = kale::Resolver::FromDNSName(
       reinterpret_cast<const uint8_t *>(name.data()));
   ASSERT(domain == "www.google.com");
+  int skip = kale::Resolver::SkipDNSName(
+      reinterpret_cast<const uint8_t *>(name.data()));
+  ASSERT(skip == static_cast<int>(name.size()));
 }
 
 TEST(T, Query) {
@@ -42,6 +45,9 @@ TEST(T, Query) {
   ASSERT(query);
   auto response = resovler.WaitForResult(*query, 5000);
   ASSERT(response);
+  for (auto &answer : *response) {
+    KL_DEBUG("%s", answer.c_str());
+  }
 }
 
 int main() { return KL_TEST(); }

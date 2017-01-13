@@ -18,6 +18,11 @@ public:
                                          uint16_t transaction_id);
   static std::string DNSName(const char *name);
   static std::string FromDNSName(const uint8_t *base);
+  // RETURNS: number of bytes skipped
+  static int SkipDNSName(const uint8_t *base);
+  // RETURNS: number of bytes skipped
+  static kl::Result<int> RetrieveRecord(const uint8_t *base,
+                                        std::string *record);
   // RETURNS: (transaction_id, query_result_list)
   static kl::Result<std::pair<uint16_t, std::vector<std::string>>>
   ParseResponse(const uint8_t *packet, size_t len);

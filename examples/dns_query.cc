@@ -17,7 +17,10 @@ int main() {
   auto query = resolver.SendQuery("www.facebook.com", server, port);
   assert(query);
   KL_DEBUG("local addr %s", resolver.LocalAddr().c_str());
-  auto resp = resolver.WaitForResult(*query);
+  auto resp = resolver.WaitForResult(*query, 10000);
   assert(resp);
+  for (auto &answer : *resp) {
+    KL_DEBUG("%s", answer.c_str());
+  }
   return 0;
 }
