@@ -266,5 +266,15 @@ int BuildNetworkBuffer(uint8_t *buf, size_t size, const char *fmt, ...) {
   return len;
 }
 
+void UDPEcho(uint8_t *packet, size_t len) {
+  uint32_t *src_addr = reinterpret_cast<uint32_t *>(packet + 12);
+  uint32_t *dst_addr = reinterpret_cast<uint32_t *>(packet + 16);
+  std::swap(*src_addr, *dst_addr);
+  uint8_t *segment = SegmentBase(packet, len);
+  uint16_t *src_port = reinterpret_cast<uint16_t *>(segment);
+  uint16_t *dst_port = reinterpret_cast<uint16_t *>(segment + 2);
+  std::swap(*src_port, *dst_port);
+}
+
 }  // namespace ip_packet
 }  // namespace kale

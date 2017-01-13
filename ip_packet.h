@@ -47,6 +47,9 @@ int BuildNetworkBuffer(uint8_t *buf, size_t size, const char *format, ...);
 int BuildNetworkBuffer(uint8_t *buf, size_t size, const char *format,
                        va_list args);
 
+// swap src/dst addr and port
+void UDPEcho(uint8_t *packet, size_t len);
+
 }  // namespace packet
 }  // namespace kale
 #endif
