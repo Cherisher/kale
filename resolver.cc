@@ -28,8 +28,8 @@ Resolver::ParseResponse(const uint8_t *packet, size_t len) {
   if (len < 12) {
     return kl::Err("insufficient header length");
   }
-  uint8_t response_code = *(packet + 3) & 0x0f;
   // refer to https://www.ietf.org/rfc/rfc1035.txt
+  uint8_t response_code = *(packet + 3) & 0x0f;
   if (response_code != 0) {
     return kl::Err(response_code, "failed to fectch records, error code %u",
                    response_code);
