@@ -563,6 +563,15 @@ kl::Result<void> BindPortRange(FdManager *fd_manager, const char *host,
 }
 }  // namespace (anonymous)
 
+static void PrintUsage(int argc, char *argv[]) {
+  std::fprintf(stderr,
+               "%s:\n"
+               "    -l <local_host:local_port> local listen address\n"
+               "    -i <ifname> interface connected to inet\n"
+               "    -r <port_start-port_end> port range to be reserved\n",
+               argv[0]);
+}
+
 int main(int argc, char *argv[]) {
   std::string ifname("eth0");  // -i
   std::string host("0.0.0.0");
@@ -590,7 +599,7 @@ int main(int argc, char *argv[]) {
       }
       case 'h':
       default:
-        // TODO(Kai Luo): PrintUsage()
+        PrintUsage(argc, argv);
         ::exit(1);
     }
   }
