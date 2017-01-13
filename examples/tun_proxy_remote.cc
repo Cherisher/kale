@@ -442,7 +442,7 @@ void Proxy::SnifferWaitAndHandle() {
   char buf[65536];
   const uint8_t *raw_packet = sniffer_.NextPacket(&header);
   if (raw_packet == nullptr) {
-    KL_ERROR("recv NULL packet");
+    // KL_ERROR("recv NULL packet");
     // stop or continue
     return;
   }
