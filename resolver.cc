@@ -1,20 +1,138 @@
 // Copyright (c) 2017 Kai Luo <gluokai@gmail.com>. All rights reserved.
 #include <arpa/inet.h>
+#include <thread>
 #include <unistd.h>
 
 #include "ip_packet.h"
+#include "kl/env.h"
+#include "kl/epoll.h"
 #include "kl/inet.h"
 #include "kl/logger.h"
 #include "resolver.h"
 
 namespace kale {
 
-Resolver::Resolver(int fd) : fd_(fd), transaction_id_(0) { assert(fd_ >= 0); }
+Resolver::Resolver(int fd) : fd_(fd), transaction_id_(0), stop_listen_(false) {
+  assert(fd_ >= 0);
+  // Launch a thread to receive response
+  LaunchListenThread();
+}
+
+void Resolver::SetExitReason(const char *func, int line, const char *reason) {
+  KL_ERROR("%s:%d: %s", func, line, reason);
+  exit_reason_ = reason;
+}
+
+kl::Result<std::pair<uint16_t, std::vector<std::string>>>
+Resolver::ParseResponse(const uint8_t *packet, size_t len) {
+  if (len < 12) {
+    return kl::Err("insufficient header length");
+  }
+  uint8_t response_code = *(packet + 3) & 0x0f;
+  // refer to https://www.ietf.org/rfc/rfc1035.txt
+  if (response_code != 0) {
+    return kl::Err(response_code, "failed to fectch records, error code %u",
+                   response_code);
+  }
+  std::vector<std::string> result;
+  uint16_t transaction_id = ntohs(*reinterpret_cast<const uint16_t *>(packet));
+  uint16_t answer_count =
+      ntohs(*reinterpret_cast<const uint16_t *>(packet + 6));
+  uint16_t nameserver_count =
+      ntohs(*reinterpret_cast<const uint16_t *>(packet + 8));
+  uint16_t additional_count =
+      ntohs(*reinterpret_cast<const uint16_t *>(packet + 10));
+  const uint8_t *ptr = packet + 12;
+  for (uint16_t i = 0; i < answer_count; ++i) {
+  }
+  for (uint16_t i = 0; i < nameserver_count; ++i) {
+  }
+  for (uint16_t i = 0; i < additional_count; ++i) {
+  }
+
+  return kl::Ok(std::make_pair(transaction_id, std::move(result)));
+}
+
+void Resolver::LaunchListenThread() {
+  listen_thread_ = std::make_unique<std::thread>([this] {
+    kl::env::SetNonBlocking(fd_);
+    kl::Epoll epoll;
+    epoll.AddFd(fd_, EPOLLET | EPOLLIN);
+    while (!stop_listen_) {
+      auto wait = epoll.Wait(1, 1000);
+      if (!wait) {
+        SetExitReason(__FUNCTION__, __LINE__, wait.Err().ToCString());
+        return;
+      }
+      auto &event_list = *wait;
+      if (event_list.size() == 0) {
+        continue;
+      }
+      auto &event = event_list[0];
+      int fd = event.data.fd;
+      uint32_t events = event.events;
+      if (events & EPOLLIN) {
+        char buf[65536];
+        while (true) {
+          int nread = ::read(fd, buf, sizeof(buf));
+          if (nread < 0) {
+            if (errno != EAGAIN && errno != EWOULDBLOCK) {
+              SetExitReason(__FUNCTION__, __LINE__, std::strerror(errno));
+              return;
+            } else {
+              break;
+            }
+          }
+          assert(nread >= 0);
+          auto parse =
+              ParseResponse(reinterpret_cast<const uint8_t *>(buf), nread);
+          if (!parse) {
+            KL_ERROR(parse.Err().ToCString());
+            continue;
+          }
+          // Due to incremental transaction id, lock might be not needed
+          std::unique_lock<std::mutex> _(mutex_);
+          response_.insert(std::move(*parse));
+          cv_.notify_all();
+        }
+      }
+      if (events & EPOLLERR) {
+        int err = kl::inet::SocketError(fd);
+        if (err != 0) {
+          SetExitReason(__FUNCTION__, __LINE__, std::strerror(err));
+        } else {
+          SetExitReason(__FUNCTION__, __LINE__, "EPOLLERR");
+        }
+      }
+    }
+  });
+}
+
+void Resolver::StopListenThread() {
+  stop_listen_.store(true);
+  listen_thread_->join();
+}
 
 Resolver::~Resolver() {
+  StopListenThread();
   if (fd_ >= 0) {
     ::close(fd_);
   }
+}
+
+std::string Resolver::FromDNSName(const uint8_t *base) {
+  std::vector<char> tmp;
+  uint8_t count = *base;
+  while (count != 0) {
+    while (count-- > 0) {
+      tmp.push_back(*(++base));
+    }
+    count = *(++base);
+    if (count) {
+      tmp.push_back('.');
+    }
+  }
+  return std::string(tmp.data(), tmp.size());
 }
 
 std::string Resolver::DNSName(const char *name) {
@@ -54,17 +172,20 @@ kl::Result<uint16_t> Resolver::SendQuery(const char *name, const char *server,
   return kl::Ok(id);
 }
 
-// TODO(Kai Luo): implement it
 kl::Result<std::vector<std::string>>
-Resolver::WaitForResult(uint16_t transaction_id) {
-  char buf[1024];
-  std::vector<std::string> result;
-  int nread = ::read(fd_, buf, sizeof(buf));
-  if (nread < 0) {
-    return kl::Err(errno, std::strerror(errno));
+Resolver::WaitForResult(uint16_t transaction_id, int timeout) {
+  std::unique_lock<std::mutex> l(mutex_);
+  decltype(response_.begin()) iter;
+  if (cv_.wait_for(l, std::chrono::milliseconds(timeout),
+                   [&iter, this, transaction_id] {
+                     iter = response_.find(transaction_id);
+                     return iter != response_.end();
+                   })) {
+    auto result = std::move(iter->second);
+    response_.erase(iter);
+    return kl::Ok(std::move(result));
   }
-  KL_DEBUG("read %d bytes", nread);
-  return kl::Ok(result);
+  return kl::Err("timeout");
 }
 
 std::string Resolver::LocalAddr() {
