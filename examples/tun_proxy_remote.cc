@@ -25,6 +25,29 @@
 
 namespace {
 
+void StatTCP(const uint8_t *packet, size_t len) {
+  KL_DEBUG("tcp segment, src addr %s, dst addr %s, data length: %u",
+           kale::ip_packet::TCPSrcAddr(packet, len).c_str(),
+           kale::ip_packet::TCPDstAddr(packet, len).c_str(),
+           kale::ip_packet::TCPDataLength(packet, len));
+}
+
+void StatUDP(const uint8_t *packet, size_t len) {
+  KL_DEBUG("udp segment, src addr %s, dst addr %s, data length: %u",
+           kale::ip_packet::UDPSrcAddr(packet, len).c_str(),
+           kale::ip_packet::UDPDstAddr(packet, len).c_str(),
+           kale::ip_packet::UDPDataLength(packet, len));
+}
+
+void StatIPPacket(const uint8_t *packet, size_t len) {
+  if (kale::ip_packet::IsTCP(packet, len)) {
+    StatTCP(packet, len);
+  }
+  if (kale::ip_packet::IsUDP(packet, len)) {
+    StatUDP(packet, len);
+  }
+}
+
 class FdManager {
 public:
   void AddFd(int fd) {
@@ -505,8 +528,7 @@ void Proxy::SnifferHandleTCP(uint8_t *packet, size_t len) {
   kale::ip_packet::TCPFillChecksum(packet, len);
   kale::ip_packet::IPFillChecksum(packet, len);
   // Sending back to client
-  KL_DEBUG("gonna send tcp segment back to %s:%u's subnet host %s:%u",
-           peer_addr.c_str(), peer_port, subnet_addr.c_str(), subnet_port);
+  StatIPPacket(packet, len);
   SnifferSendBack(peer_addr.c_str(), peer_port,
                   reinterpret_cast<const char *>(packet), len);
 }
@@ -529,8 +551,7 @@ void Proxy::SnifferHandleUDP(uint8_t *packet, size_t len) {
   kale::ip_packet::UDPFillChecksum(packet, len);
   kale::ip_packet::IPFillChecksum(packet, len);
   // Sending back to client
-  KL_DEBUG("gonna send udp segment back to %s:%u's subnet host %s:%u",
-           peer_addr.c_str(), peer_port, subnet_addr.c_str(), subnet_port);
+  StatIPPacket(packet, len);
   SnifferSendBack(peer_addr.c_str(), peer_port,
                   reinterpret_cast<const char *>(packet), len);
 }
