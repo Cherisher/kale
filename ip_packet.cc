@@ -16,7 +16,7 @@ uint16_t IPHeaderLength(const uint8_t *packet, size_t len) {
 
 uint16_t TCPHeaderLength(const uint8_t *packet, size_t len) {
   const uint8_t *segment = SegmentBase(packet, len);
-  uint16_t data_offset = ntohs(*(segment + 12) >> 4);
+  uint16_t data_offset = *(segment + 12) >> 4;
   if (data_offset > 5) {
     return data_offset << 2;
   }
