@@ -14,6 +14,17 @@ uint16_t IPHeaderLength(const uint8_t *packet, size_t len) {
   return (0x0f & packet[0]) << 2;
 }
 
+uint16_t TCPHeaderLength(const uint8_t *packet, size_t len) {
+  const uint8_t *segment = SegmentBase(packet, len);
+  uint16_t data_offset = ntohs(*(segment + 12) >> 4);
+  if (data_offset > 5) {
+    return data_offset << 2;
+  }
+  return 20;
+}
+
+uint16_t UDPHeaderLength(const uint8_t *packet, size_t len) { return 8; }
+
 bool IsUDP(const uint8_t *packet, size_t len) {
   assert(len >= 10);
   return packet[9] == 0x11;
@@ -274,6 +285,54 @@ void UDPEcho(uint8_t *packet, size_t len) {
   uint16_t *src_port = reinterpret_cast<uint16_t *>(segment);
   uint16_t *dst_port = reinterpret_cast<uint16_t *>(segment + 2);
   std::swap(*src_port, *dst_port);
+}
+
+std::string TCPSrcAddr(const uint8_t *packet, size_t len) {
+  const char *addr = inet_ntoa(in_addr{
+      .s_addr = SrcAddr(packet, len),
+  });
+  uint16_t port = ntohs(TCPSrcPort(packet, len));
+  char buf[64];
+  std::snprintf(buf, sizeof(buf), "%s:%u", addr, port);
+  return std::string(buf);
+}
+
+std::string TCPDstAddr(const uint8_t *packet, size_t len) {
+  const char *addr = inet_ntoa(in_addr{
+      .s_addr = DstAddr(packet, len),
+  });
+  uint16_t port = ntohs(TCPDstPort(packet, len));
+  char buf[64];
+  std::snprintf(buf, sizeof(buf), "%s:%u", addr, port);
+  return std::string(buf);
+}
+
+std::string UDPSrcAddr(const uint8_t *packet, size_t len) {
+  const char *addr = inet_ntoa(in_addr{
+      .s_addr = SrcAddr(packet, len),
+  });
+  uint16_t port = ntohs(UDPSrcPort(packet, len));
+  char buf[64];
+  std::snprintf(buf, sizeof(buf), "%s:%u", addr, port);
+  return std::string(buf);
+}
+
+std::string UDPDstAddr(const uint8_t *packet, size_t len) {
+  const char *addr = inet_ntoa(in_addr{
+      .s_addr = DstAddr(packet, len),
+  });
+  uint16_t port = ntohs(UDPDstPort(packet, len));
+  char buf[64];
+  std::snprintf(buf, sizeof(buf), "%s:%u", addr, port);
+  return std::string(buf);
+}
+
+size_t TCPDataLength(const uint8_t *packet, size_t len) {
+  return len - IPHeaderLength(packet, len) - TCPHeaderLength(packet, len);
+}
+
+size_t UDPDataLength(const uint8_t *packet, size_t len) {
+  return len - IPHeaderLength(packet, len) - UDPHeaderLength(packet, len);
 }
 
 }  // namespace ip_packet

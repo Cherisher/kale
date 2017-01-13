@@ -30,6 +30,19 @@ void IPFillChecksum(uint8_t *packet, size_t len);
 void UDPFillChecksum(uint8_t *packet, size_t len);
 void TCPFillChecksum(uint8_t *packet, size_t len);
 
+// human readable string
+std::string TCPSrcAddr(const uint8_t *packet, size_t len);
+std::string TCPDstAddr(const uint8_t *packet, size_t len);
+std::string UDPSrcAddr(const uint8_t *packet, size_t len);
+std::string UDPDstAddr(const uint8_t *packet, size_t len);
+
+uint16_t TCPHeaderLength(const uint8_t *packet, size_t len);
+uint16_t UDPHeaderLength(const uint8_t *packet, size_t len);
+
+// data length of the segment
+size_t TCPDataLength(const uint8_t *packet, size_t len);
+size_t UDPDataLength(const uint8_t *packet, size_t len);
+
 // @return: in network byte order
 // @x: in network byte order
 uint32_t ChecksumCarry(uint32_t x);

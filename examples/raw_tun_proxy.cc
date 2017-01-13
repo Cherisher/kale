@@ -17,6 +17,30 @@
 #include "tun.h"
 
 namespace {
+
+void StatTCP(const uint8_t *packet, size_t len) {
+  KL_DEBUG("tcp segment, src addr %s, dst addr %s, data length: %u",
+           kale::ip_packet::TCPSrcAddr(packet, len).c_str(),
+           kale::ip_packet::TCPDstAddr(packet, len).c_str(),
+           kale::ip_packet::TCPDataLength(packet, len));
+}
+
+void StatUDP(const uint8_t *packet, size_t len) {
+  KL_DEBUG("udp segment, src addr %s, dst addr %s, data length: %u",
+           kale::ip_packet::UDPSrcAddr(packet, len).c_str(),
+           kale::ip_packet::UDPDstAddr(packet, len).c_str(),
+           kale::ip_packet::UDPDataLength(packet, len));
+}
+
+void StatIPPacket(const uint8_t *packet, size_t len) {
+  if (kale::ip_packet::IsTCP(packet, len)) {
+    StatTCP(packet, len);
+  }
+  if (kale::ip_packet::IsUDP(packet, len)) {
+    StatUDP(packet, len);
+  }
+}
+
 class RawTunProxy {
 public:
   RawTunProxy(const char *ifname, const char *addr, const char *mask,
@@ -114,6 +138,9 @@ kl::Result<void> RawTunProxy::HandleTUN() {
       }
       break;
     }
+    const uint8_t *packet = reinterpret_cast<const uint8_t *>(buf);
+    size_t len = nread;
+    StatIPPacket(packet, len);
     std::string compress;
     snappy::Compress(buf, nread, &compress);
     auto send = kl::inet::Sendto(udp_fd_, compress.data(), compress.size(), 0,
@@ -121,8 +148,6 @@ kl::Result<void> RawTunProxy::HandleTUN() {
     if (!send) {
       return kl::Err(send.MoveErr());
     }
-    KL_DEBUG("send %d bytes to %s:%u", *send, remote_host_.c_str(),
-             remote_port_);
   }
   return kl::Ok();
 }
@@ -144,18 +169,15 @@ kl::Result<void> RawTunProxy::HandleUDP() {
       // just ignore it
       continue;
     }
+    const uint8_t *packet =
+        reinterpret_cast<const uint8_t *>(uncompress.data());
+    size_t len = uncompress.size();
+    StatIPPacket(packet, len);
     int nwrite = ::write(tun_fd_, uncompress.data(), uncompress.size());
     if (nwrite < 0) {
       return kl::Err(errno, std::strerror(errno));
     }
-    KL_DEBUG("write %d bytes back to tun", nwrite);
-    const uint8_t *packet =
-        reinterpret_cast<const uint8_t *>(uncompress.data());
-    size_t len = uncompress.size();
-    if (kale::ip_packet::IsUDP(packet, len)) {
-      KL_DEBUG("udp dst port: %u",
-               ntohs(kale::ip_packet::UDPDstPort(packet, len)));
-    }
+    assert(nwrite == static_cast<int>(len));
   }
   return kl::Ok();
 }
