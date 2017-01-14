@@ -8,6 +8,7 @@
 #include <string>
 #include <thread>
 
+#include "arcfour.h"
 #include "ip_packet.h"
 #include "kl/bitset.h"
 #include "kl/env.h"
@@ -24,6 +25,8 @@
 #include "tun.h"
 
 namespace {
+
+static uint8_t kKey[4] = {0xc0, 0xde, 0xc0, 0xde};
 
 void StatTCP(const uint8_t *packet, size_t len) {
   KL_DEBUG("tcp segment, src addr %s, dst addr %s, data length: %u",
@@ -167,7 +170,8 @@ public:
         uint16_t port_min, uint16_t port_max)
       : stop_(false), ifname_(ifname), addr_(local_addr), port_min_(port_min),
         port_max_(port_max), port_(local_port), udp_nat_(port_min, port_max),
-        tcp_nat_(port_min, port_max), sniffer_(ifname) {
+        tcp_nat_(port_min, port_max), sniffer_(ifname),
+        cipher_(kKey, sizeof(kKey)) {
     inet_aton(addr_.c_str(), &in_addr_);
   }
 
@@ -315,6 +319,7 @@ private:
   int udp_fd_;
   // Used to send IPv4 packets to inet host
   int raw_fd_;
+  kale::arcfour::Cipher cipher_;
 };
 
 void Proxy::EpollHandleTCP(const char *peer_addr, uint16_t peer_port,
@@ -421,10 +426,13 @@ void Proxy::OnUDPRecvFromPeer() {
       KL_ERROR("failed to uncompress buf");
       break;
     }
-    assert(uncompress.size() <= sizeof(buf));
-    ::memcpy(buf, uncompress.data(), uncompress.size());
+    auto dec =
+        cipher_.Decrypt(reinterpret_cast<const uint8_t *>(uncompress.data()),
+                        uncompress.size());
+    assert(dec.size() <= sizeof(buf));
+    ::memcpy(buf, dec.data(), dec.size());
     uint8_t *packet = reinterpret_cast<uint8_t *>(buf);
-    const size_t len = uncompress.size();
+    const size_t len = dec.size();
     if (kale::ip_packet::IsTCP(packet, len)) {
       EpollHandleTCP(peer_addr.c_str(), peer_port, packet, len);
     } else if (kale::ip_packet::IsUDP(packet, len)) {
@@ -498,8 +506,10 @@ void Proxy::SnifferWaitAndHandle() {
 
 void Proxy::SnifferSendBack(const char *addr, uint16_t port, const char *buf,
                             size_t len) {
+  auto enc = cipher_.Encrypt(reinterpret_cast<const uint8_t *>(buf), len);
   std::string compress;
-  snappy::Compress(buf, len, &compress);
+  snappy::Compress(reinterpret_cast<const char *>(enc.data()), enc.size(),
+                   &compress);
   auto send = kl::inet::Sendto(udp_fd_, compress.data(), compress.size(), 0,
                                addr, port);
   if (!send) {

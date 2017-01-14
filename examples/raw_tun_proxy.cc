@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 
+#include "arcfour.h"
 #include "ip_packet.h"
 #include "kl/env.h"
 #include "kl/epoll.h"
@@ -17,6 +18,8 @@
 #include "tun.h"
 
 namespace {
+
+static uint8_t kKey[4] = {0xc0, 0xde, 0xc0, 0xde};
 
 void StatTCP(const uint8_t *packet, size_t len) {
   KL_DEBUG("tcp segment, src addr %s, dst addr %s, data length: %u",
@@ -66,6 +69,7 @@ private:
   uint16_t remote_port_;
   int tun_fd_, udp_fd_;
   kl::Epoll epoll_;
+  kale::arcfour::Cipher cipher_;
 };
 
 RawTunProxy::RawTunProxy(const char *ifname, const char *addr, const char *mask,
@@ -73,7 +77,7 @@ RawTunProxy::RawTunProxy(const char *ifname, const char *addr, const char *mask,
                          uint16_t remote_port)
     : ifname_(ifname), addr_(addr), mask_(mask), mtu_(mtu),
       remote_host_(remote_host), remote_port_(remote_port), tun_fd_(-1),
-      udp_fd_(-1) {
+      udp_fd_(-1), cipher_(kKey, sizeof(kKey)) {
   auto alloc_tun = kale::AllocateTun(ifname);
   if (!alloc_tun) {
     throw std::runtime_error(alloc_tun.Err().ToCString());
@@ -141,8 +145,10 @@ kl::Result<void> RawTunProxy::HandleTUN() {
     const uint8_t *packet = reinterpret_cast<const uint8_t *>(buf);
     size_t len = nread;
     StatIPPacket(packet, len);
+    auto enc = cipher_.Encrypt(packet, len);
     std::string compress;
-    snappy::Compress(buf, nread, &compress);
+    snappy::Compress(reinterpret_cast<const char *>(enc.data()), enc.size(),
+                     &compress);
     auto send = kl::inet::Sendto(udp_fd_, compress.data(), compress.size(), 0,
                                  remote_host_.c_str(), remote_port_);
     if (!send) {
@@ -169,11 +175,13 @@ kl::Result<void> RawTunProxy::HandleUDP() {
       // just ignore it
       continue;
     }
-    const uint8_t *packet =
-        reinterpret_cast<const uint8_t *>(uncompress.data());
-    size_t len = uncompress.size();
+    auto dec =
+        cipher_.Decrypt(reinterpret_cast<const uint8_t *>(uncompress.data()),
+                        uncompress.size());
+    const uint8_t *packet = dec.data();
+    size_t len = dec.size();
     StatIPPacket(packet, len);
-    int nwrite = ::write(tun_fd_, uncompress.data(), uncompress.size());
+    int nwrite = ::write(tun_fd_, packet, len);
     if (nwrite < 0) {
       return kl::Err(errno, std::strerror(errno));
     }
