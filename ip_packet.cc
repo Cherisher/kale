@@ -152,7 +152,7 @@ uint16_t TCPChecksum(const uint8_t *packet, size_t len) {
     sum += x;
   }
   if (tcp_len & 1) {
-    sum += static_cast<uint16_t>(*(segment + tcp_len - 1));
+    sum += *(segment + tcp_len - 1);
   }
   return ChecksumCarry(sum);
 }
@@ -177,7 +177,7 @@ uint16_t UDPChecksum(const uint8_t *packet, size_t len) {
     sum += x;
   }
   if (udp_len & 1) {
-    sum += static_cast<uint16_t>(*(segment + udp_len - 1));
+    sum += *(segment + udp_len - 1);
   }
   return ChecksumCarry(sum);
 }
