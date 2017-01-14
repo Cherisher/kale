@@ -144,7 +144,7 @@ uint16_t TCPChecksum(const uint8_t *packet, size_t len) {
   sum += *reinterpret_cast<const uint16_t *>(packet + 16);
   sum += *reinterpret_cast<const uint16_t *>(packet + 18);
   // protocol & len
-  sum += 0x0600 + htons(tcp_len);
+  sum += ntohs(0x06 + tcp_len);
   // tcp segment
   for (size_t i = 0; i < tcp_len; i = i + 2) {
     uint16_t x =
@@ -169,7 +169,7 @@ uint16_t UDPChecksum(const uint8_t *packet, size_t len) {
   sum += *reinterpret_cast<const uint16_t *>(packet + 16);
   sum += *reinterpret_cast<const uint16_t *>(packet + 18);
   // protocol & len
-  sum += 0x1100 + *reinterpret_cast<const uint16_t *>(segment + 4);
+  sum += ntohs(0x11 + udp_len);
   // udp segment
   for (size_t i = 0; i < udp_len; i = i + 2) {
     uint16_t x =

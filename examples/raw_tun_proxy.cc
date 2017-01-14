@@ -22,6 +22,9 @@ namespace {
 static uint8_t kKey[4] = {0xc0, 0xde, 0xc0, 0xde};
 
 void StatTCP(const uint8_t *packet, size_t len) {
+  const uint8_t *segment = kale::ip_packet::SegmentBase(packet, len);
+  assert(*reinterpret_cast<const uint16_t *>(segment + 16) ==
+         kale::ip_packet::TCPChecksum(packet, len));
   KL_DEBUG("tcp segment, src addr %s, dst addr %s, data length: %u",
            kale::ip_packet::TCPSrcAddr(packet, len).c_str(),
            kale::ip_packet::TCPDstAddr(packet, len).c_str(),
@@ -29,6 +32,12 @@ void StatTCP(const uint8_t *packet, size_t len) {
 }
 
 void StatUDP(const uint8_t *packet, size_t len) {
+  const uint8_t *segment = kale::ip_packet::SegmentBase(packet, len);
+  // KL_DEBUG("actual checksum %u, checksum calculated %u",
+  //          *reinterpret_cast<const uint16_t *>(segment + 6),
+  //          kale::ip_packet::UDPChecksum(packet, len));
+  assert(*reinterpret_cast<const uint16_t *>(segment + 6) ==
+         kale::ip_packet::UDPChecksum(packet, len));
   KL_DEBUG("udp segment, src addr %s, dst addr %s, data length: %u",
            kale::ip_packet::UDPSrcAddr(packet, len).c_str(),
            kale::ip_packet::UDPDstAddr(packet, len).c_str(),
@@ -36,6 +45,8 @@ void StatUDP(const uint8_t *packet, size_t len) {
 }
 
 void StatIPPacket(const uint8_t *packet, size_t len) {
+  assert(kale::ip_packet::IPHeaderChecksum(packet, len) ==
+         *reinterpret_cast<const uint16_t *>(packet + 10));
   if (kale::ip_packet::IsTCP(packet, len)) {
     StatTCP(packet, len);
   }
