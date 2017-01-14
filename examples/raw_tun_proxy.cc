@@ -23,8 +23,12 @@ static uint8_t kKey[4] = {0xc0, 0xde, 0xc0, 0xde};
 
 void StatTCP(const uint8_t *packet, size_t len) {
   const uint8_t *segment = kale::ip_packet::SegmentBase(packet, len);
-  assert(*reinterpret_cast<const uint16_t *>(segment + 16) ==
-         kale::ip_packet::TCPChecksum(packet, len));
+  uint16_t actual_checksum = *reinterpret_cast<const uint16_t *>(segment + 16);
+  uint16_t calc_checksum = kale::ip_packet::TCPChecksum(packet, len);
+  if (actual_checksum != calc_checksum) {
+    KL_ERROR("tcp actual_checksum: %u, calc_checksum: %u", actual_checksum,
+             calc_checksum);
+  }
   KL_DEBUG("tcp segment, src addr %s, dst addr %s, data length: %u",
            kale::ip_packet::TCPSrcAddr(packet, len).c_str(),
            kale::ip_packet::TCPDstAddr(packet, len).c_str(),
@@ -36,8 +40,12 @@ void StatUDP(const uint8_t *packet, size_t len) {
   // KL_DEBUG("actual checksum %u, checksum calculated %u",
   //          *reinterpret_cast<const uint16_t *>(segment + 6),
   //          kale::ip_packet::UDPChecksum(packet, len));
-  assert(*reinterpret_cast<const uint16_t *>(segment + 6) ==
-         kale::ip_packet::UDPChecksum(packet, len));
+  uint16_t actual_checksum = *reinterpret_cast<const uint16_t *>(segment + 6);
+  uint16_t calc_checksum = kale::ip_packet::UDPChecksum(packet, len);
+  if (actual_checksum != calc_checksum) {
+    KL_ERROR("udp actual_checksum: %u, calc_checksum: %u", actual_checksum,
+             calc_checksum);
+  }
   KL_DEBUG("udp segment, src addr %s, dst addr %s, data length: %u",
            kale::ip_packet::UDPSrcAddr(packet, len).c_str(),
            kale::ip_packet::UDPDstAddr(packet, len).c_str(),
