@@ -22,7 +22,6 @@ std::vector<uint8_t> Cipher::Encrypt(const uint8_t *buffer, size_t len) {
   for (size_t i = 0; i < len; ++i) {
     j = (j + 1) & 0xff;
     k = (k + state_[j]) & 0xff;
-    std::swap(j, k);
     result.push_back(buffer[i] ^ state_[(state_[j] + state_[k]) & 0xff]);
   }
   return result;
