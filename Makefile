@@ -6,11 +6,9 @@ SNAPPY := snappy
 SNAPPY_LIB := libsnappy.a
 LIBPCAP := libpcap
 LIBPCAP_LIB := libpcap.a
-LIBNET := libnet
-LIBNET_LIB := libnet.a
 CXX := g++
-CXXFLAGS := -Wall -g -std=c++14 -I$(LIBPCAP) -I$(LIBNET)/libnet/include -O2
-LDFLAGS := -lpthread -L. -lkale -lsnappy -lpcap -lnet -lkl
+CXXFLAGS := -Wall -g -std=c++14 -I$(LIBPCAP) -O2
+LDFLAGS := -lpthread -L. -lkale -lsnappy -lpcap -lkl
 STATICLIB := libkale.a
 OBJECTS := tun.o ip_packet.o sniffer.o resolver.o arcfour.o
 TESTS := $(patsubst %.cc, %, $(wildcard *_test.cc))
@@ -22,9 +20,6 @@ $(SNAPPY_LIB): $(SNAPPY)
 
 $(LIBPCAP_LIB): $(LIBPCAP)
 	@cd $< && ./configure && $(MAKE) && cp $@ ../
-
-$(LIBNET_LIB): $(LIBNET)
-	@cd $</libnet && ../Prepare && ../Build && $(MAKE) && cp ./src/.libs/libnet.a ../../
 
 $(SNAPPY):
 	@git submodule update --remote $@
@@ -44,7 +39,7 @@ $(KL):
 $(STATICLIB): $(OBJECTS)
 	@ar rcsv $@ $^
 
-$(TESTS): $(STATICLIB) $(KL_LIB) $(SNAPPY_LIB) $(LIBPCAP_LIB) $(LIBNET_LIB)
+$(TESTS): $(STATICLIB) $(KL_LIB) $(SNAPPY_LIB) $(LIBPCAP_LIB)
 
 $(TESTS): %_test: %_test.o
 	$(CXX) $(CXXFLAGS) $< -o $@ $(LDFLAGS)
