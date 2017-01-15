@@ -155,7 +155,7 @@ public:
 private:
   // TODO(Kai Luo): Use LRU
   int AllocatePort() {
-    int n = lru_.GetLRU();
+    int n = port_min_ + lru_.GetLRU();
     assert(n >= port_min_ && n <= port_max_);
     return n;
   }
