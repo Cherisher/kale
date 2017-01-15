@@ -6,6 +6,8 @@
 #include <string>
 
 #include "arcfour.h"
+#include "coding.h"
+#include "demo_coding.h"
 #include "ip_packet.h"
 #include "kl/env.h"
 #include "kl/epoll.h"
@@ -18,8 +20,6 @@
 #include "tun.h"
 
 namespace {
-
-static uint8_t kKey[4] = {0xc0, 0xde, 0xc0, 0xde};
 
 void StatTCP(const uint8_t *packet, size_t len) {
   const uint8_t *segment = kale::ip_packet::SegmentBase(packet, len);
@@ -88,7 +88,7 @@ private:
   uint16_t remote_port_;
   int tun_fd_, udp_fd_;
   kl::Epoll epoll_;
-  kale::arcfour::Cipher cipher_;
+  kale::Coding coding_;
 };
 
 RawTunProxy::RawTunProxy(const char *ifname, const char *addr, const char *mask,
@@ -96,7 +96,7 @@ RawTunProxy::RawTunProxy(const char *ifname, const char *addr, const char *mask,
                          uint16_t remote_port)
     : ifname_(ifname), addr_(addr), mask_(mask), mtu_(mtu),
       remote_host_(remote_host), remote_port_(remote_port), tun_fd_(-1),
-      udp_fd_(-1), cipher_(kKey, sizeof(kKey)) {
+      udp_fd_(-1), coding_(kale::DemoCoding()) {
   auto alloc_tun = kale::AllocateTun(ifname);
   if (!alloc_tun) {
     throw std::runtime_error(alloc_tun.Err().ToCString());
@@ -164,11 +164,13 @@ kl::Result<void> RawTunProxy::HandleTUN() {
     const uint8_t *packet = reinterpret_cast<const uint8_t *>(buf);
     size_t len = nread;
     StatIPPacket(packet, len);
-    auto enc = cipher_.Encrypt(packet, len);
-    std::string compress;
-    snappy::Compress(reinterpret_cast<const char *>(enc.data()), enc.size(),
-                     &compress);
-    auto send = kl::inet::Sendto(udp_fd_, compress.data(), compress.size(), 0,
+    // auto enc = cipher_.Encrypt(packet, len);
+    // std::string compress;
+    // snappy::Compress(reinterpret_cast<const char *>(enc.data()), enc.size(),
+    //                  &compress);
+    std::vector<uint8_t> data;
+    coding_.Encode(packet, len, &data);
+    auto send = kl::inet::Sendto(udp_fd_, data.data(), data.size(), 0,
                                  remote_host_.c_str(), remote_port_);
     if (!send) {
       return kl::Err(send.MoveErr());
@@ -187,18 +189,16 @@ kl::Result<void> RawTunProxy::HandleUDP() {
       }
       break;
     }
-    std::string uncompress;
-    bool ok = snappy::Uncompress(buf, nread, &uncompress);
+    std::vector<uint8_t> data;
+    auto ok =
+        coding_.Decode(reinterpret_cast<const uint8_t *>(buf), nread, &data);
     if (!ok) {
-      KL_ERROR("failed to uncompress from buf");
+      KL_ERROR(ok.Err().ToCString());
       // just ignore it
       continue;
     }
-    auto dec =
-        cipher_.Decrypt(reinterpret_cast<const uint8_t *>(uncompress.data()),
-                        uncompress.size());
-    const uint8_t *packet = dec.data();
-    size_t len = dec.size();
+    const uint8_t *packet = data.data();
+    size_t len = data.size();
     StatIPPacket(packet, len);
     int nwrite = ::write(tun_fd_, packet, len);
     if (nwrite < 0) {

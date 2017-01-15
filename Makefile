@@ -10,7 +10,7 @@ CXX := g++
 CXXFLAGS := -Wall -g -std=c++14 -I$(LIBPCAP) -O2
 LDFLAGS := -lpthread -L. -lkale -lsnappy -lpcap -lkl
 STATICLIB := libkale.a
-OBJECTS := tun.o ip_packet.o sniffer.o resolver.o arcfour.o
+OBJECTS := tun.o ip_packet.o sniffer.o resolver.o arcfour.o demo_coding.o
 TESTS := $(patsubst %.cc, %, $(wildcard *_test.cc))
 
 all: $(STATICLIB) $(TESTS)
