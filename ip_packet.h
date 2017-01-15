@@ -1,4 +1,7 @@
 // Copyright (c) 2017 Kai Luo <gluokai@gmail.com>. All rights reserved.
+// Use of this source code is governed by the BSD license that can be found in
+// the LICENSE file.
+
 #ifndef KALE_IP_PACKET_H_
 #define KALE_IP_PACKET_H_
 #include "kl/error.h"
