@@ -65,7 +65,8 @@ void StatIPPacket(const uint8_t *packet, size_t len) {
 
 class RawTunProxy {
 public:
-  RawTunProxy(const char *ifname, const char *addr, const char *mask,
+  RawTunProxy(const char *inet_ifname, const char *inet_gateway,
+              const char *ifname, const char *addr, const char *mask,
               uint16_t mtu, const char *remote_host, uint16_t remote_port);
 
   int Run();
@@ -91,7 +92,8 @@ private:
   kale::Coding coding_;
 };
 
-RawTunProxy::RawTunProxy(const char *ifname, const char *addr, const char *mask,
+RawTunProxy::RawTunProxy(const char *inet_ifname, const char *inet_gateway,
+                         const char *ifname, const char *addr, const char *mask,
                          uint16_t mtu, const char *remote_host,
                          uint16_t remote_port)
     : ifname_(ifname), addr_(addr), mask_(mask), mtu_(mtu),
@@ -118,6 +120,18 @@ RawTunProxy::RawTunProxy(const char *ifname, const char *addr, const char *mask,
   auto if_up = kl::netdev::InterfaceUp(ifname);
   if (!if_up) {
     throw std::runtime_error(if_up.Err().ToCString());
+  }
+  auto add_route = kl::netdev::AddRoute(remote_host, inet_gateway, inet_ifname);
+  if (!add_route && add_route.Err().Code() != EEXIST) {
+    throw std::runtime_error(kl::string::FormatString(
+        "%s:%d: failed to add route entry, %s\n", __FILE__, __LINE__,
+        add_route.Err().ToCString()));
+  }
+  add_route = kl::netdev::AddDefaultGateway(addr);
+  if (!add_route && add_route.Err().Code() != EEXIST) {
+    throw std::runtime_error(kl::string::FormatString(
+        "%s:%d: failed to add route entry, %s\n", __FILE__, __LINE__,
+        add_route.Err().ToCString()));
   }
   auto udp = kl::udp::Socket();
   if (!udp) {
@@ -253,6 +267,8 @@ int RawTunProxy::EpollLoop() {
 
 static void PrintUsage(int argc, char *argv[]) {
   std::fprintf(stderr, "%s:\n"
+                       "    -n <inet_interface>\n"
+                       "    -g <inet_gateway>\n"
                        "    -r <remote_host:remote_port>\n"
                        "    -i <tun_name>\n"
                        "    -a <tun_addr>\n"
@@ -270,7 +286,7 @@ int main(int argc, char *argv[]) {
   std::string tun_mask("255.255.255.0");  // -m
   uint16_t tun_mtu = 1380;
   int opt = 0;
-  while ((opt = ::getopt(argc, argv, "r:t:a:d:m:h")) != -1) {
+  while ((opt = ::getopt(argc, argv, "n:g:r:t:a:d:m:h")) != -1) {
     switch (opt) {
       case 'n': {
         inet_ifname = optarg;
@@ -325,20 +341,8 @@ int main(int argc, char *argv[]) {
     PrintUsage(argc, argv);
     ::exit(1);
   }
-  auto add_route = kl::netdev::AddRoute(
-      remote_host.c_str(), inet_gateway.c_str(), inet_ifname.c_str());
-  if (!add_route && add_route.Err().Code() != EEXIST) {
-    std::fprintf(stderr, "%s: failed to add route entry, %s", argv[0],
-                 add_route.Err().ToCString());
-    ::exit(1);
-  }
-  add_route = kl::netdev::AddDefaultGateway(tun_addr.c_str());
-  if (!add_route && add_route.Err().Code() != EEXIST) {
-    std::fprintf(stderr, "%s: failed to add route entry, %s", argv[0],
-                 add_route.Err().ToCString());
-    ::exit(1);
-  }
-  RawTunProxy proxy(tun_name.c_str(), tun_addr.c_str(), tun_mask.c_str(),
-                    tun_mtu, remote_host.c_str(), remote_port);
+  RawTunProxy proxy(inet_ifname.c_str(), inet_gateway.c_str(), tun_name.c_str(),
+                    tun_addr.c_str(), tun_mask.c_str(), tun_mtu,
+                    remote_host.c_str(), remote_port);
   return proxy.Run();
 }
