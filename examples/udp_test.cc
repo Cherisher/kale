@@ -7,7 +7,6 @@
 #include "kl/udp.h"
 
 int main() {
-  const char *ifname = "tun0";
   const char *dst_addr = "216.58.193.99";
   const std::string message("c", 1472);
   uint16_t dst_port = 80;
@@ -15,10 +14,6 @@ int main() {
   assert(udp_sock);
   int fd = *udp_sock;
   kl::env::Defer defer([fd] { ::close(fd); });
-  auto bind_if = kl::netdev::BindInterface(fd, ifname);
-  assert(bind_if);
-  // Or reverse path route filter might drop packets
-  kl::netdev::AddRoute(dst_addr, nullptr, ifname);
   auto send = kl::inet::Sendto(fd, message.data(), message.size(), 0, dst_addr,
                                dst_port);
   assert(send);
