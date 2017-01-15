@@ -2,7 +2,7 @@
 #include "demo_coding.h"
 #include "arcfour.h"
 #include "kl/error.h"
-#include "snappy.h"
+#include "snappy/snappy.h"
 
 namespace kale {
 
