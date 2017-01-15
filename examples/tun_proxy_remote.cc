@@ -599,7 +599,8 @@ static void PrintUsage(int argc, char *argv[]) {
                "%s:\n"
                "    -l <local_host:local_port> local listen address\n"
                "    -i <ifname> interface connected to inet\n"
-               "    -r <port_start-port_end> port range to be reserved\n",
+               "    -r <port_start-port_end> port range to be reserved\n"
+               "    -d daemon\n",
                argv[0]);
 }
 
@@ -608,9 +609,14 @@ int main(int argc, char *argv[]) {
   std::string host("0.0.0.0");
   uint16_t port = 4000;                         // -l
   uint16_t port_min = 60000, port_max = 60255;  // -r
+  bool daemonize = false;
   int opt = 0;
-  while ((opt = ::getopt(argc, argv, "i:l:r:h")) != -1) {
+  while ((opt = ::getopt(argc, argv, "i:l:r:hd")) != -1) {
     switch (opt) {
+      case 'd': {
+        daemonize = true;
+        break;
+      }
       case 'i': {
         ifname = optarg;
         break;
@@ -632,6 +638,14 @@ int main(int argc, char *argv[]) {
       default:
         PrintUsage(argc, argv);
         ::exit(1);
+    }
+  }
+  // daemonize
+  if (daemonize) {
+    int err = ::daemon(1, 1);
+    if (err < 0) {
+      KL_ERROR(std::strerror(errno));
+      ::exit(1);
     }
   }
   // Bind ports so that OS won't use these ports
