@@ -173,7 +173,9 @@ kl::Result<void> RawTunProxy::HandleTUN() {
     auto send = kl::inet::Sendto(udp_fd_, data.data(), data.size(), 0,
                                  remote_host_.c_str(), remote_port_);
     if (!send) {
-      return kl::Err(send.MoveErr());
+      if (send.Err().Code() != EAGAIN && send.Err().Code() != EWOULDBLOCK) {
+        return kl::Err(send.MoveErr());
+      }
     }
   }
   return kl::Ok();
@@ -201,10 +203,9 @@ kl::Result<void> RawTunProxy::HandleUDP() {
     size_t len = data.size();
     StatIPPacket(packet, len);
     int nwrite = ::write(tun_fd_, packet, len);
-    if (nwrite < 0) {
+    if (nwrite < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
       return kl::Err(errno, std::strerror(errno));
     }
-    assert(nwrite == static_cast<int>(len));
   }
   return kl::Ok();
 }
