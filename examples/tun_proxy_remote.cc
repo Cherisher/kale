@@ -12,7 +12,6 @@
 #include "coding.h"
 #include "demo_coding.h"
 #include "ip_packet.h"
-#include "kl/bitset.h"
 #include "kl/env.h"
 #include "kl/epoll.h"
 #include "kl/inet.h"
@@ -22,6 +21,7 @@
 #include "kl/tcp.h"
 #include "kl/udp.h"
 #include "kl/wait_group.h"
+#include "lru.h"
 #include "snappy/snappy.h"
 #include "sniffer.h"
 #include "tun.h"
@@ -85,7 +85,7 @@ class NAT {
 public:
   NAT(uint16_t port_min, uint16_t port_max)
       : port_min_(port_min), port_max_(port_max),
-        bitset_(port_max - port_min + 1) {}
+        lru_(port_max - port_min + 1) {}
 
   // RETURNS: local port allocated
   kl::Result<uint16_t> AddEntry(const char *peer_addr, uint16_t peer_port,
@@ -119,6 +119,7 @@ public:
     if (iter == port_to_host_.end()) {
       return kl::Err("no such entry");
     }
+    lru_.Use(port);
     auto split = kl::string::SplitString(iter->second.c_str(), ":");
     assert(split.size() == 4);
     return kl::Ok(std::make_tuple(
@@ -130,6 +131,7 @@ public:
     if (iter == port_to_host_.end()) {
       return kl::Err("no such entry");
     }
+    lru_.Use(port);
     auto split = kl::string::SplitString(iter->second.c_str(), ":");
     assert(split.size() == 4);
     return kl::Ok(std::make_tuple(
@@ -142,6 +144,7 @@ public:
     if (iter == port_to_host_.end()) {
       return kl::Err("no such entry");
     }
+    lru_.Use(port);
     auto split = kl::string::SplitString(iter->second.c_str(), ":");
     assert(split.size() == 4);
     return kl::Ok(std::make_tuple(
@@ -152,22 +155,12 @@ public:
 private:
   // TODO(Kai Luo): Use LRU
   int AllocatePort() {
-    int n = bitset_.SetFirstZeroBit();
-    if (n < 0) {
-      // FIXME(Kai Luo): use lru to replace random
-      return port_min_ +
-             (port_max_ - port_min_) * kl::random::UniformSampleFloat();
-    }
-    if (n + port_min_ > port_max_) {
-      bitset_.Clear(n);
-      // FIXME(Kai Luo): use lru to replace random
-      return port_min_ +
-             (port_max_ - port_min_) * kl::random::UniformSampleFloat();
-    }
-    return n + port_min_;
+    int n = lru_.GetLRU();
+    assert(n >= port_min_ && n <= port_max_);
+    return n;
   }
   uint16_t port_min_, port_max_;
-  kl::BitSet bitset_;
+  kale::LRU lru_;
   std::map<uint16_t, std::string> port_to_host_;
   std::map<std::string, uint16_t> host_to_port_;
 };
