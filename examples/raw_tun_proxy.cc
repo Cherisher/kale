@@ -275,7 +275,8 @@ static void PrintUsage(int argc, char *argv[]) {
                        "    -r <remote_host:remote_port>\n"
                        "    -i <tun_name>\n"
                        "    -a <tun_addr>\n"
-                       "    -m <tun_mask>\n",
+                       "    -m <tun_mask>\n"
+                       "    -d daemonize\n",
                argv[0]);
 }
 
@@ -288,9 +289,14 @@ int main(int argc, char *argv[]) {
   std::string tun_addr("10.0.0.1");       // -a
   std::string tun_mask("255.255.255.0");  // -m
   uint16_t tun_mtu = 1380;
+  bool daemonize = false;
   int opt = 0;
-  while ((opt = ::getopt(argc, argv, "n:g:r:t:a:d:m:h")) != -1) {
+  while ((opt = ::getopt(argc, argv, "n:g:r:t:a:d:m:hd")) != -1) {
     switch (opt) {
+      case 'd': {
+        daemonize = true;
+        break;
+      }
       case 'n': {
         inet_ifname = optarg;
         break;
@@ -323,6 +329,13 @@ int main(int argc, char *argv[]) {
       default:
         PrintUsage(argc, argv);
         ::exit(1);
+    }
+  }
+  if (daemonize) {
+    int err = ::daemon(1, 1);
+    if (err < 0) {
+      KL_ERROR(std::strerror(errno));
+      ::exit(1);
     }
   }
   if (remote_host.empty() || remote_port == 0 ||
