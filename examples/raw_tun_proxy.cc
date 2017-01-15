@@ -263,6 +263,8 @@ static void PrintUsage(int argc, char *argv[]) {
 int main(int argc, char *argv[]) {
   std::string remote_host;
   uint16_t remote_port = 0;               // -r
+  std::string inet_ifname;                // -n
+  std::string inet_gateway;               // -g
   std::string tun_name("tun0");           // -i
   std::string tun_addr("10.0.0.1");       // -a
   std::string tun_mask("255.255.255.0");  // -m
@@ -270,6 +272,14 @@ int main(int argc, char *argv[]) {
   int opt = 0;
   while ((opt = ::getopt(argc, argv, "r:t:a:d:m:h")) != -1) {
     switch (opt) {
+      case 'n': {
+        inet_ifname = optarg;
+        break;
+      }
+      case 'g': {
+        inet_gateway = optarg;
+        break;
+      }
       case 'r': {
         auto split = kl::inet::SplitAddr(optarg, &remote_host, &remote_port);
         if (!split) {
@@ -296,10 +306,36 @@ int main(int argc, char *argv[]) {
         ::exit(1);
     }
   }
-  if (remote_host.empty() || remote_port == 0) {
+  if (remote_host.empty() || remote_port == 0 ||
+      !kl::inet::InetSockAddr(remote_host.c_str(), remote_port)) {
     std::fprintf(stderr, "%s: invalid remote host %s:%u\n", argv[0],
                  remote_host.c_str(), remote_port);
     PrintUsage(argc, argv);
+    ::exit(1);
+  }
+  if (inet_ifname.empty()) {
+    std::fprintf(stderr, "%s: inet interface must be specified.", argv[0]);
+    PrintUsage(argc, argv);
+    ::exit(1);
+  }
+  if (inet_gateway.empty() ||
+      !kl::inet::InetSockAddr(inet_gateway.c_str(), 0)) {
+    std::fprintf(stderr, "%s: invalid inet gateway address %s", argv[0],
+                 inet_gateway.c_str());
+    PrintUsage(argc, argv);
+    ::exit(1);
+  }
+  auto add_route = kl::netdev::AddRoute(
+      remote_host.c_str(), inet_gateway.c_str(), inet_ifname.c_str());
+  if (!add_route && add_route.Err().Code() != EEXIST) {
+    std::fprintf(stderr, "%s: failed to add route entry, %s", argv[0],
+                 add_route.Err().ToCString());
+    ::exit(1);
+  }
+  add_route = kl::netdev::AddDefaultGateway(tun_addr.c_str());
+  if (!add_route && add_route.Err().Code() != EEXIST) {
+    std::fprintf(stderr, "%s: failed to add route entry, %s", argv[0],
+                 add_route.Err().ToCString());
     ::exit(1);
   }
   RawTunProxy proxy(tun_name.c_str(), tun_addr.c_str(), tun_mask.c_str(),
