@@ -9,6 +9,8 @@
 #include <thread>
 
 #include "arcfour.h"
+#include "coding.h"
+#include "demo_coding.h"
 #include "ip_packet.h"
 #include "kl/bitset.h"
 #include "kl/env.h"
@@ -25,8 +27,6 @@
 #include "tun.h"
 
 namespace {
-
-static uint8_t kKey[4] = {0xc0, 0xde, 0xc0, 0xde};
 
 void StatTCP(const uint8_t *packet, size_t len) {
   const uint8_t *segment = kale::ip_packet::SegmentBase(packet, len);
@@ -179,7 +179,7 @@ public:
       : stop_(false), ifname_(ifname), addr_(local_addr), port_min_(port_min),
         port_max_(port_max), port_(local_port), udp_nat_(port_min, port_max),
         tcp_nat_(port_min, port_max), sniffer_(ifname),
-        cipher_(kKey, sizeof(kKey)) {
+        coding_(kale::DemoCoding()) {
     inet_aton(addr_.c_str(), &in_addr_);
   }
 
@@ -327,7 +327,8 @@ private:
   int udp_fd_;
   // Used to send IPv4 packets to inet host
   int raw_fd_;
-  kale::arcfour::Cipher cipher_;
+  // kale::arcfour::Cipher cipher_;
+  kale::Coding coding_;
 };
 
 void Proxy::EpollHandleTCP(const char *peer_addr, uint16_t peer_port,
@@ -423,24 +424,21 @@ void Proxy::OnUDPRecvFromPeer() {
       Stop(recv.Err().ToCString());
       return;
     }
-    // TODO(Kai Luo): Implement a snappy::Sink to reduce copy
     int nread = std::get<0>(*recv);
     assert(nread >= 0);
     std::string &peer_addr = std::get<1>(*recv);
     uint32_t peer_port = std::get<2>(*recv);
-    std::string uncompress;
-    bool ok = snappy::Uncompress(buf, nread, &uncompress);
+    std::vector<uint8_t> data;
+    auto ok =
+        coding_.Decode(reinterpret_cast<const uint8_t *>(buf), nread, &data);
     if (!ok) {
-      KL_ERROR("failed to uncompress buf");
+      KL_ERROR(ok.Err().ToCString());
       break;
     }
-    auto dec =
-        cipher_.Decrypt(reinterpret_cast<const uint8_t *>(uncompress.data()),
-                        uncompress.size());
-    assert(dec.size() <= sizeof(buf));
-    ::memcpy(buf, dec.data(), dec.size());
+    assert(data.size() <= sizeof(buf));
+    ::memcpy(buf, data.data(), data.size());
     uint8_t *packet = reinterpret_cast<uint8_t *>(buf);
-    const size_t len = dec.size();
+    const size_t len = data.size();
     if (kale::ip_packet::IsTCP(packet, len)) {
       EpollHandleTCP(peer_addr.c_str(), peer_port, packet, len);
     } else if (kale::ip_packet::IsUDP(packet, len)) {
@@ -514,12 +512,10 @@ void Proxy::SnifferWaitAndHandle() {
 
 void Proxy::SnifferSendBack(const char *addr, uint16_t port, const char *buf,
                             size_t len) {
-  auto enc = cipher_.Encrypt(reinterpret_cast<const uint8_t *>(buf), len);
-  std::string compress;
-  snappy::Compress(reinterpret_cast<const char *>(enc.data()), enc.size(),
-                   &compress);
-  auto send = kl::inet::Sendto(udp_fd_, compress.data(), compress.size(), 0,
-                               addr, port);
+  std::vector<uint8_t> data;
+  coding_.Encode(reinterpret_cast<const uint8_t *>(buf), len, &data);
+  auto send =
+      kl::inet::Sendto(udp_fd_, data.data(), data.size(), 0, addr, port);
   if (!send) {
     KL_ERROR(send.Err().ToCString());
   }
