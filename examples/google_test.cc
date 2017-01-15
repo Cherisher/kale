@@ -17,7 +17,7 @@ int main() {
   auto bind_if = kl::netdev::BindInterface(fd, ifname);
   assert(bind_if);
   // Or reverse path route filter might drop packets
-  kl::netdev::AddRoute(ifname, dst_addr);
+  kl::netdev::AddRoute(dst_addr, nullptr, ifname);
   auto connect = kl::inet::BlockingConnect(fd, dst_addr, dst_port);
   assert(connect);
   const std::string get("GET / HTTP/1.1\r\n\r\n");

@@ -12,7 +12,7 @@ int main() {
   assert(udp);
   auto bind_if = kl::netdev::BindInterface(*udp, ifname);
   assert(bind_if);
-  kl::netdev::AddRoute(ifname, server);
+  kl::netdev::AddRoute(server, nullptr, ifname);
   kale::Resolver resolver(*udp);
   auto query = resolver.SendQuery("www.facebook.com", server, port);
   assert(query);

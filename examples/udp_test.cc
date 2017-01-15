@@ -18,7 +18,7 @@ int main() {
   auto bind_if = kl::netdev::BindInterface(fd, ifname);
   assert(bind_if);
   // Or reverse path route filter might drop packets
-  kl::netdev::AddRoute(ifname, dst_addr);
+  kl::netdev::AddRoute(dst_addr, nullptr, ifname);
   auto send = kl::inet::Sendto(fd, message.data(), message.size(), 0, dst_addr,
                                dst_port);
   assert(send);
