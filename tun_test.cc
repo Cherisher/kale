@@ -47,7 +47,7 @@ TEST(T, ReadWriteTun) {
   ASSERT(kl::netdev::InterfaceUp(ifname));
   ASSERT(kl::netdev::SetAddr(ifname, addr));
   ASSERT(kl::netdev::SetNetMask(ifname, mask));
-  ASSERT(kl::netdev::AddRoute(ifname, dst_addr));
+  ASSERT(kl::netdev::AddRoute(dst_addr, nullptr, ifname));
   auto send_thread = std::thread([addr, message, ifname, dst_addr, dst_port] {
     auto sock = kl::udp::Socket();
     ASSERT(sock);
