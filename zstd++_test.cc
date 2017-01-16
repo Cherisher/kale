@@ -12,7 +12,11 @@
 class T {};
 TEST(T, CompressAndDecompress) {
   const std::string message(
-      "Copyright (c) 2017 Kai Luo <gluokai@gmail.com>. All rights reserved.");
+      "Zstd can also offer stronger compression ratios at the cost of "
+      "compression speed. Speed vs Compression trade-off is configurable by "
+      "small increments. Decompression speed is preserved and remains roughly "
+      "the same at all settings, a property shared by most LZ compression "
+      "algorithms, such as zlib or lzma.");
   char buf[1024];
   int len = kale::ip_packet::BuildNetworkBuffer(
       reinterpret_cast<uint8_t *>(buf), sizeof(buf), "#s", message.size(),
