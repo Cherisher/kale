@@ -2,8 +2,8 @@
 // Use of this source code is governed by the BSD license that can be found in
 // the LICENSE file.
 
-#ifndef KALE_PCAP_H_
-#define KALE_PCAP_H_
+#ifndef KALE_SNIFFER_H_
+#define KALE_SNIFFER_H_
 #include <string>
 
 #include "kl/error.h"
