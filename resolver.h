@@ -2,6 +2,8 @@
 // Use of this source code is governed by the BSD license that can be found in
 // the LICENSE file.
 
+#ifndef KALE_RESOLVER_H_
+#define KALE_RESOLVER_H_
 #include <atomic>
 #include <condition_variable>
 #include <map>
@@ -58,3 +60,4 @@ private:
 };
 
 }  // namespace kale
+#endif
