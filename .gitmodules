@@ -10,9 +10,6 @@
 	path = libpcap
 	url = git://github.com/the-tcpdump-group/libpcap.git
         ignore = dirty
-[submodule "lz4"]
-	path = lz4
-	url = git://github.com/lz4/lz4.git
 [submodule "zstd"]
 	path = zstd
 	url = git://github.com/facebook/zstd.git
