@@ -16,6 +16,8 @@ public:
   explicit LRU(size_t size);
   bool Use(uint32_t v);
   uint32_t GetLRU();
+  uint32_t Head();
+  uint32_t Tail();
   size_t Size();
   ~LRU();
 
@@ -44,6 +46,10 @@ inline bool LRU::Use(uint32_t v) {
   InsertBefore(head_, n);
   return true;
 }
+
+inline uint32_t LRU::Head() { return head_->id; }
+
+inline uint32_t LRU::Tail() { return tail_->id; }
 
 inline uint32_t LRU::GetLRU() {
   Node *n = tail_;
