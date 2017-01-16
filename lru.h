@@ -2,8 +2,8 @@
 // Use of this source code is governed by the BSD license that can be found in
 // the LICENSE file.
 
-#ifndef KALE_LRH_H_
-#define KALE_LRH_H_
+#ifndef KALE_LRU_H_
+#define KALE_LRU_H_
 #include <cassert>
 #include <cstdint>
 #include <map>
