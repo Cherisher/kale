@@ -40,9 +40,6 @@ void StatTCP(const uint8_t *packet, size_t len) {
 
 void StatUDP(const uint8_t *packet, size_t len) {
   const uint8_t *segment = kale::ip_packet::SegmentBase(packet, len);
-  // KL_DEBUG("actual checksum %u, checksum calculated %u",
-  //          *reinterpret_cast<const uint16_t *>(segment + 6),
-  //          kale::ip_packet::UDPChecksum(packet, len));
   uint16_t actual_checksum = *reinterpret_cast<const uint16_t *>(segment + 6);
   uint16_t calc_checksum = kale::ip_packet::UDPChecksum(packet, len);
   if (actual_checksum != calc_checksum) {
