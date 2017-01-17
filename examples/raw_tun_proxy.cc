@@ -178,10 +178,6 @@ kl::Result<void> RawTunProxy::HandleTUN() {
     const uint8_t *packet = reinterpret_cast<const uint8_t *>(buf);
     size_t len = nread;
     StatIPPacket(packet, len);
-    // auto enc = cipher_.Encrypt(packet, len);
-    // std::string compress;
-    // snappy::Compress(reinterpret_cast<const char *>(enc.data()), enc.size(),
-    //                  &compress);
     std::vector<uint8_t> data;
     coding_.Encode(packet, len, &data);
     auto send = kl::inet::Sendto(udp_fd_, data.data(), data.size(), 0,
