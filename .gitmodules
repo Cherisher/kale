@@ -2,10 +2,6 @@
 	path = kl
         url = git://github.com/bzEq/kl.git
         ignore = dirty
-[submodule "snappy"]
-	path = snappy
-	url = git://github.com/google/snappy.git
-        ignore = dirty
 [submodule "libpcap"]
 	path = libpcap
 	url = git://github.com/the-tcpdump-group/libpcap.git
