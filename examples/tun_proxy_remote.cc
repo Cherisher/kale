@@ -361,7 +361,8 @@ void Proxy::EpollHandleTCP(const char *peer_addr, uint16_t peer_port,
            dst_port);
   auto send =
       kl::inet::Sendto(raw_fd_, packet, len, 0, dst_addr.c_str(), dst_port);
-  if (!send) {
+  if (!send && send.Err().Code() != EAGAIN &&
+      send.Err().Code() != EWOULDBLOCK) {
     KL_ERROR(send.Err().ToCString());
   }
 }
@@ -401,7 +402,8 @@ void Proxy::EpollHandleUDP(const char *peer_addr, uint16_t peer_port,
            dst_port);
   auto send =
       kl::inet::Sendto(raw_fd_, packet, len, 0, dst_addr.c_str(), dst_port);
-  if (!send) {
+  if (!send && send.Err().Code() != EAGAIN &&
+      send.Err().Code() != EWOULDBLOCK) {
     KL_ERROR(send.Err().ToCString());
   }
 }
@@ -511,7 +513,8 @@ void Proxy::SnifferSendBack(const char *addr, uint16_t port, const char *buf,
   coding_.Encode(reinterpret_cast<const uint8_t *>(buf), len, &data);
   auto send =
       kl::inet::Sendto(udp_fd_, data.data(), data.size(), 0, addr, port);
-  if (!send) {
+  if (!send && send.Err().Code() != EAGAIN &&
+      send.Err().Code() != EWOULDBLOCK) {
     KL_ERROR(send.Err().ToCString());
   }
 }

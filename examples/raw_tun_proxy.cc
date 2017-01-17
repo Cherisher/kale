@@ -181,10 +181,9 @@ kl::Result<void> RawTunProxy::HandleTUN() {
     coding_.Encode(packet, len, &data);
     auto send = kl::inet::Sendto(udp_fd_, data.data(), data.size(), 0,
                                  remote_host_.c_str(), remote_port_);
-    if (!send) {
-      if (send.Err().Code() != EAGAIN && send.Err().Code() != EWOULDBLOCK) {
-        return kl::Err(send.MoveErr());
-      }
+    if (!send && send.Err().Code() != EAGAIN &&
+        send.Err().Code() != EWOULDBLOCK) {
+      return kl::Err(send.MoveErr());
     }
   }
   return kl::Ok();
