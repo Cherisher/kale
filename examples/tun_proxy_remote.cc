@@ -25,7 +25,6 @@
 #include "kl/udp.h"
 #include "kl/wait_group.h"
 #include "lru.h"
-#include "snappy/snappy.h"
 #include "sniffer.h"
 #include "tun.h"
 

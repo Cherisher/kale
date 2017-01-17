@@ -19,7 +19,6 @@
 #include "kl/netdev.h"
 #include "kl/string.h"
 #include "kl/udp.h"
-#include "snappy/snappy.h"
 #include "tun.h"
 
 namespace {

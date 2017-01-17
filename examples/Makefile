@@ -3,7 +3,7 @@
 LIBPCAP := ../libpcap
 CXX := g++
 CXXFLAGS := -Wall -g -std=c++14 -I.. -I$(LIBPCAP) -O2
-LDFLAGS := -lpthread -L.. -lkale -lsnappy -lpcap -lkl
+LDFLAGS := -lpthread -L.. -lkale -lpcap -lkl
 OBJECTS := raw_tun_proxy.o tun_proxy_remote.o baidu_test.o \
 	google_test.o dns_query.o
 
