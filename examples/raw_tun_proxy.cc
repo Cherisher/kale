@@ -269,7 +269,8 @@ static void PrintUsage(int argc, char *argv[]) {
                        "    -i <tun_name>\n"
                        "    -a <tun_addr>\n"
                        "    -m <tun_mask>\n"
-                       "    -d daemonize\n",
+                       "    -d daemonize\n"
+                       "    -u <mtu> mtu\n",
                argv[0]);
 }
 
@@ -281,11 +282,15 @@ int main(int argc, char *argv[]) {
   std::string tun_name("tun0");           // -i
   std::string tun_addr("10.0.0.1");       // -a
   std::string tun_mask("255.255.255.0");  // -m
-  uint16_t tun_mtu = 1380;
+  uint16_t tun_mtu = 1380;                // -u
   bool daemonize = false;
   int opt = 0;
-  while ((opt = ::getopt(argc, argv, "n:g:r:t:a:d:m:hd")) != -1) {
+  while ((opt = ::getopt(argc, argv, "n:g:r:t:a:d:m:hdu:")) != -1) {
     switch (opt) {
+      case 'u': {
+        tun_mtu = atoi(optarg);
+        break;
+      }
       case 'd': {
         daemonize = true;
         break;
