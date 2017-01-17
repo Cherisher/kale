@@ -2,6 +2,7 @@
 // Use of this source code is governed by the BSD license that can be found in
 // the LICENSE file.
 
+// An implementation of Least-Recently-Used structure.
 #ifndef KALE_LRU_H_
 #define KALE_LRU_H_
 #include <cassert>

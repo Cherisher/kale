@@ -2,6 +2,8 @@
 // Use of this source code is governed by the BSD license that can be found in
 // the LICENSE file.
 
+// Routines operating on Linux Tun device
+
 #ifndef KALE_TUN_H_
 #define KALE_TUN_H_
 #include <string>

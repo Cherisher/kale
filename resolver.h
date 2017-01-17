@@ -2,6 +2,8 @@
 // Use of this source code is governed by the BSD license that can be found in
 // the LICENSE file.
 
+// An simple implementation of DNS query.
+
 #ifndef KALE_RESOLVER_H_
 #define KALE_RESOLVER_H_
 #include <atomic>

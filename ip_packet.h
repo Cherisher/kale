@@ -2,6 +2,7 @@
 // Use of this source code is governed by the BSD license that can be found in
 // the LICENSE file.
 
+// Some routines operating on IP packets.
 #ifndef KALE_IP_PACKET_H_
 #define KALE_IP_PACKET_H_
 #include "kl/error.h"

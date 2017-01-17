@@ -2,6 +2,8 @@
 // Use of this source code is governed by the BSD license that can be found in
 // the LICENSE file.
 
+// A trivial wrapper of pcap library.
+
 #ifndef KALE_SNIFFER_H_
 #define KALE_SNIFFER_H_
 #include <string>
