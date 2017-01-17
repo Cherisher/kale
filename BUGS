@@ -1,0 +1,4 @@
+* When computer falls into suspend mode and back to normal, route
+entries added by the lib are removed.
+
+* Lib working in multi-level NAT environment is not tested yet.
