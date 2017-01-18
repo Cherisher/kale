@@ -21,6 +21,7 @@
 #include "kl/logger.h"
 #include "kl/random.h"
 #include "kl/rwlock.h"
+#include "kl/string.h"
 #include "kl/tcp.h"
 #include "kl/udp.h"
 #include "kl/wait_group.h"
@@ -29,6 +30,26 @@
 #include "tun.h"
 
 namespace {
+
+kl::Status InsertIptablesRules(uint16_t port_min, uint16_t port_max) {
+  static const char *kInsertCommand =
+      "iptables -A INPUT -s 0.0.0.0/0.0.0.0 -p %s --dport %u -j DROP";
+  for (uint16_t i = port_min; i <= port_max; ++i) {
+    auto command = kl::string::FormatString(kInsertCommand, "udp", i);
+    int ok = ::system(command.c_str());
+    if (ok != 0) {
+      return kl::Err("failed insert udp rule --dport %u DROP", i);
+    }
+  }
+  for (uint16_t i = port_min; i <= port_max; ++i) {
+    auto command = kl::string::FormatString(kInsertCommand, "tcp", i);
+    int ok = ::system(command.c_str());
+    if (ok != 0) {
+      return kl::Err("failed insert tcp rule --dport %u DROP", i);
+    }
+  }
+  return kl::Ok();
+}
 
 void StatTCP(const uint8_t *packet, size_t len) {
   const uint8_t *segment = kale::ip_packet::SegmentBase(packet, len);
@@ -658,6 +679,11 @@ int main(int argc, char *argv[]) {
     KL_ERROR(bind_range.Err().ToCString());
   }
   // TODO(Kai Luo): use iptables to drop packets towards these ports
+  auto insert = InsertIptablesRules(port_min, port_max);
+  if (!insert) {
+    KL_ERROR(insert.Err().ToCString());
+    ::exit(1);
+  }
   Proxy proxy(ifname.c_str(), host.c_str(), port, port_min, port_max);
   auto run = proxy.Run();
   if (!run) {
