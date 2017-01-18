@@ -176,7 +176,6 @@ public:
   }
 
 private:
-  // TODO(Kai Luo): Use LRU
   int AllocatePort() {
     int n = port_min_ + lru_.GetLRU();
     assert(n >= port_min_ && n <= port_max_);
@@ -678,7 +677,6 @@ int main(int argc, char *argv[]) {
   if (!bind_range) {
     KL_ERROR(bind_range.Err().ToCString());
   }
-  // TODO(Kai Luo): use iptables to drop packets towards these ports
   auto insert = InsertIptablesRules(port_min, port_max);
   if (!insert) {
     KL_ERROR(insert.Err().ToCString());
