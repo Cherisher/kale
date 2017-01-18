@@ -32,18 +32,30 @@
 namespace {
 
 kl::Status InsertIptablesRules(uint16_t port_min, uint16_t port_max) {
-  static const char *kInsertCommand =
-      "iptables -A INPUT -s 0.0.0.0/0.0.0.0 -p %s --dport %u -j DROP";
+  static const char *kCheckRule = "iptables -C INPUT -s 0.0.0.0/0.0.0.0 -p %s "
+                                  "--dport %u -j DROP 2> /dev/null";
+  static const char *kInsertCommand = "iptables -A INPUT -s 0.0.0.0/0.0.0.0 -p "
+                                      "%s --dport %u -j DROP 2> /dev/null";
   for (uint16_t i = port_min; i <= port_max; ++i) {
-    auto command = kl::string::FormatString(kInsertCommand, "udp", i);
-    int ok = ::system(command.c_str());
+    auto check = kl::string::FormatString(kCheckRule, "udp", i);
+    int ok = ::system(check.c_str());
+    if (ok == 0) {
+      continue;
+    }
+    auto insert = kl::string::FormatString(kInsertCommand, "udp", i);
+    ok = ::system(insert.c_str());
     if (ok != 0) {
       return kl::Err("failed insert udp rule --dport %u DROP", i);
     }
   }
   for (uint16_t i = port_min; i <= port_max; ++i) {
+    auto check = kl::string::FormatString(kCheckRule, "tcp", i);
+    int ok = ::system(check.c_str());
+    if (ok == 0) {
+      continue;
+    }
     auto command = kl::string::FormatString(kInsertCommand, "tcp", i);
-    int ok = ::system(command.c_str());
+    ok = ::system(command.c_str());
     if (ok != 0) {
       return kl::Err("failed insert tcp rule --dport %u DROP", i);
     }
