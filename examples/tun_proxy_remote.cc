@@ -234,6 +234,10 @@ private:
   static void FindIPPacket(int datalink, struct pcap_pkthdr *header,
                            uint8_t *packet, uint8_t **ip, size_t *len) {
     switch (datalink) {
+      case DLT_LINUX_SLL:
+        *ip = packet + 16;
+        *len = header->len - 16;
+        return;
       case DLT_EN10MB:
         *ip = packet + 14;
         *len = header->len - 14;
