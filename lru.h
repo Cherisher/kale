@@ -22,7 +22,7 @@ public:
   size_t Size();
   ~LRU();
 
-private:
+protected:
   struct Node {
     uint32_t id;
     Node *prev, *next;

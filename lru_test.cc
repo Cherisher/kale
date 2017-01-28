@@ -11,6 +11,20 @@
 
 TEST(kale::LRU, Constructor, 16) {}
 
+TEST(kale::LRU, CheckSize, 1024) {
+  for (size_t i = 0; i < 1024; ++i) {
+    Use(i);
+  }
+  auto p = head_;
+  ASSERT(p != nullptr);
+  size_t size = 0;
+  while (p) {
+    ++size;
+    p = p->next;
+  }
+  ASSERT(size == 1024);
+}
+
 TEST(kale::LRU, GetLRU, 16) {
   std::vector<uint32_t> v;
   for (uint32_t i = 0; i < 16; ++i) {
