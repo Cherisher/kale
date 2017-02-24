@@ -17,6 +17,7 @@
 #include "kl/inet.h"
 #include "kl/logger.h"
 #include "kl/netdev.h"
+#include "kl/scheduler.h"
 #include "kl/string.h"
 #include "kl/udp.h"
 #include "tun.h"
@@ -89,6 +90,7 @@ private:
   int tun_fd_, udp_fd_;
   kl::Epoll epoll_;
   kale::Coding coding_;
+  kl::Scheduler worker_pool_;
 };
 
 RawTunProxy::RawTunProxy(const char *inet_ifname, const char *inet_gateway,
@@ -97,7 +99,8 @@ RawTunProxy::RawTunProxy(const char *inet_ifname, const char *inet_gateway,
                          uint16_t remote_port)
     : ifname_(ifname), addr_(addr), mask_(mask), mtu_(mtu),
       remote_host_(remote_host), remote_port_(remote_port), tun_fd_(-1),
-      udp_fd_(-1), coding_(kale::DemoCoding()) {
+      udp_fd_(-1), coding_(kale::DemoCoding()),
+      worker_pool_(std::thread::hardware_concurrency()) {
   auto alloc_tun = kale::AllocateTun(ifname);
   if (!alloc_tun) {
     throw std::runtime_error(alloc_tun.Err().ToCString());
@@ -161,7 +164,15 @@ int RawTunProxy::Run() {
     KL_ERROR(add_tun.Err().ToCString());
     return 1;
   }
-  return EpollLoop();
+  auto worker_pool_thread = std::thread([this] { worker_pool_.Go(); });
+  int err = EpollLoop();
+  if (err < 0) {
+    worker_pool_.Stop(std::strerror(err));
+  } else {
+    worker_pool_.Stop(nullptr);
+  }
+  worker_pool_thread.join();
+  return err;
 }
 
 kl::Result<void> RawTunProxy::HandleTUN() {
@@ -240,18 +251,22 @@ int RawTunProxy::EpollLoop() {
       }
       assert(events & EPOLLIN);
       if (fd == udp_fd_) {
-        auto ok = HandleUDP();
-        if (!ok) {
-          KL_ERROR(ok.Err().ToCString());
-          return ok.Err().Code();
-        }
+        worker_pool_.SubmitTask([this] {
+          auto ok = HandleUDP();
+          if (!ok) {
+            KL_ERROR(ok.Err().ToCString());
+            // return ok.Err().Code();
+          }
+        });
       }
       if (fd == tun_fd_) {
-        auto ok = HandleTUN();
-        if (!ok) {
-          KL_ERROR(ok.Err().ToCString());
-          return ok.Err().Code();
-        }
+        worker_pool_.SubmitTask([this] {
+          auto ok = HandleTUN();
+          if (!ok) {
+            KL_ERROR(ok.Err().ToCString());
+            // return ok.Err().Code();
+          }
+        });
       }
     }
   }
