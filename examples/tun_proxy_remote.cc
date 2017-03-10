@@ -65,8 +65,13 @@ kl::Status InsertIptablesRules(uint16_t port_min, uint16_t port_max) {
 
 void StatTCP(const uint8_t *packet, size_t len) {
   const uint8_t *segment = kale::ip_packet::SegmentBase(packet, len);
-  assert(*reinterpret_cast<const uint16_t *>(segment + 16) ==
-         kale::ip_packet::TCPChecksum(packet, len));
+  uint16_t actual_checksum = *reinterpret_cast<const uint16_t *>(segment + 16);
+  uint16_t calculated_checksum = kale::ip_packet::TCPChecksum(packet, len);
+  if (actual_checksum != calculated_checksum) {
+    KL_ERROR("actual checksum: %u, calculated checksum: %u", actual_checksum,
+             calculated_checksum);
+    return;
+  }
   KL_DEBUG("tcp segment, src addr %s, dst addr %s, data length: %u",
            kale::ip_packet::TCPSrcAddr(packet, len).c_str(),
            kale::ip_packet::TCPDstAddr(packet, len).c_str(),
@@ -75,8 +80,13 @@ void StatTCP(const uint8_t *packet, size_t len) {
 
 void StatUDP(const uint8_t *packet, size_t len) {
   const uint8_t *segment = kale::ip_packet::SegmentBase(packet, len);
-  assert(*reinterpret_cast<const uint16_t *>(segment + 6) ==
-         kale::ip_packet::UDPChecksum(packet, len));
+  uint16_t actual_checksum = *reinterpret_cast<const uint16_t *>(segment + 6);
+  uint16_t calculated_checksum = kale::ip_packet::UDPChecksum(packet, len);
+  if (actual_checksum != calculated_checksum) {
+    KL_ERROR("actual checksum: %u, calculated checksum: %u", actual_checksum,
+             calculated_checksum);
+    return;
+  }
   KL_DEBUG("udp segment, src addr %s, dst addr %s, data length: %u",
            kale::ip_packet::UDPSrcAddr(packet, len).c_str(),
            kale::ip_packet::UDPDstAddr(packet, len).c_str(),
@@ -84,8 +94,13 @@ void StatUDP(const uint8_t *packet, size_t len) {
 }
 
 void StatIPPacket(const uint8_t *packet, size_t len) {
-  assert(kale::ip_packet::IPHeaderChecksum(packet, len) ==
-         *reinterpret_cast<const uint16_t *>(packet + 10));
+  uint16_t actual_checksum = *reinterpret_cast<const uint16_t *>(packet + 10);
+  uint16_t calculated_checksum = kale::ip_packet::IPHeaderChecksum(packet, len);
+  if (actual_checksum != calculated_checksum) {
+    KL_ERROR("actual checksum: %u, calculated checksum: %u", actual_checksum,
+             calculated_checksum);
+    return;
+  }
   if (kale::ip_packet::IsTCP(packet, len)) {
     StatTCP(packet, len);
   }
