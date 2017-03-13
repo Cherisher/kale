@@ -53,8 +53,13 @@ void StatUDP(const uint8_t *packet, size_t len) {
 }
 
 void StatIPPacket(const uint8_t *packet, size_t len) {
-  assert(kale::ip_packet::IPHeaderChecksum(packet, len) ==
-         *reinterpret_cast<const uint16_t *>(packet + 10));
+  uint16_t actual_checksum = *reinterpret_cast<const uint16_t *>(packet + 10);
+  uint16_t calculated_checksum = kale::ip_packet::IPHeaderChecksum(packet, len);
+  if (actual_checksum != calculated_checksum) {
+    KL_ERROR("actual checksum: %u, calculated checksum: %u", actual_checksum,
+             calculated_checksum);
+    return;
+  }
   if (kale::ip_packet::IsTCP(packet, len)) {
     StatTCP(packet, len);
   }
