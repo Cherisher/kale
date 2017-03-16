@@ -2,21 +2,16 @@
 
 KL := kl
 KL_LIB := libkl.a
-ZSTD := zstd
-ZSTD_LIB := libzstd.a
 LIBPCAP := libpcap
 LIBPCAP_LIB := libpcap.a
 CXX := g++
-CXXFLAGS := -Wall -g -std=c++14 -I$(LIBPCAP) -I$(ZSTD)/lib -O2
-LDFLAGS := -lpthread -L. -lkale -lpcap -lkl -lzstd
+CXXFLAGS := -Wall -g -std=c++14 -I$(LIBPCAP) -O2
+LDFLAGS := -lpthread -L. -lkale -lpcap -lkl
 STATICLIB := libkale.a
 OBJECTS := tun.o ip_packet.o sniffer.o resolver.o arcfour.o demo_coding.o
 TESTS := $(patsubst %.cc, %, $(wildcard *_test.cc))
 
 all: $(STATICLIB) $(TESTS)
-
-$(ZSTD_LIB): $(ZSTD)
-	@cd $< && $(MAKE) && cp ./lib/libzstd.a ..
 
 $(LIBPCAP_LIB): $(LIBPCAP)
 	@cd $< && ./configure && $(MAKE) && cp $@ ../
@@ -36,7 +31,7 @@ $(KL):
 $(STATICLIB): $(OBJECTS)
 	@ar rcsv $@ $^
 
-$(TESTS): $(STATICLIB) $(KL_LIB) $(LIBPCAP_LIB) $(ZSTD_LIB)
+$(TESTS): $(STATICLIB) $(KL_LIB) $(LIBPCAP_LIB)
 
 $(TESTS): %_test: %_test.o
 	$(CXX) $(CXXFLAGS) $< -o $@ $(LDFLAGS)
