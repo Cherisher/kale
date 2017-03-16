@@ -96,9 +96,8 @@ private:
   int tun_fd_, udp_fd_;
   kl::Epoll epoll_;
   kale::Coding coding_;
-  kl::Scheduler worker_pool_;
-  std::atomic<uint64_t> write_tun_dropped_;
-  std::atomic<uint64_t> write_udp_dropped_;
+  uint64_t write_tun_dropped_;
+  uint64_t write_udp_dropped_;
 };
 
 RawTunProxy::RawTunProxy(const char *inet_ifname, const char *inet_gateway,
@@ -107,8 +106,7 @@ RawTunProxy::RawTunProxy(const char *inet_ifname, const char *inet_gateway,
                          uint16_t remote_port)
     : ifname_(ifname), addr_(addr), mask_(mask), mtu_(mtu),
       remote_host_(remote_host), remote_port_(remote_port), tun_fd_(-1),
-      udp_fd_(-1), coding_(kale::DemoCoding()),
-      worker_pool_(std::thread::hardware_concurrency()), write_tun_dropped_(0),
+      udp_fd_(-1), coding_(kale::DemoCoding()), write_tun_dropped_(0),
       write_udp_dropped_(0) {
   auto alloc_tun = kale::AllocateTun(ifname);
   if (!alloc_tun) {
@@ -173,14 +171,7 @@ int RawTunProxy::Run() {
     KL_ERROR(add_tun.Err().ToCString());
     return 1;
   }
-  auto worker_pool_thread = std::thread([this] { worker_pool_.Go(); });
   int err = EpollLoop();
-  if (err < 0) {
-    worker_pool_.Stop(std::strerror(err));
-  } else {
-    worker_pool_.Stop(nullptr);
-  }
-  worker_pool_thread.join();
   return err;
 }
 
@@ -205,7 +196,7 @@ kl::Result<void> RawTunProxy::HandleTUN() {
     if (!send &&
         (send.Err().Code() == EAGAIN || send.Err().Code() == EWOULDBLOCK)) {
       uint64_t tmp = ++write_udp_dropped_;
-      KL_ERROR("current write_udp_dropped: %u", tmp);
+      KL_ERROR("current write_udp_dropped_: %u", tmp);
     }
     if (!send && send.Err().Code() != EAGAIN &&
         send.Err().Code() != EWOULDBLOCK) {
@@ -271,20 +262,16 @@ int RawTunProxy::EpollLoop() {
       }
       assert(events & EPOLLIN);
       if (fd == udp_fd_) {
-        worker_pool_.SubmitTask([this] {
-          auto ok = HandleUDP();
-          if (!ok) {
-            KL_ERROR(ok.Err().ToCString());
-          }
-        });
+        auto ok = HandleUDP();
+        if (!ok) {
+          KL_ERROR(ok.Err().ToCString());
+        }
       }
       if (fd == tun_fd_) {
-        worker_pool_.SubmitTask([this] {
-          auto ok = HandleTUN();
-          if (!ok) {
-            KL_ERROR(ok.Err().ToCString());
-          }
-        });
+        auto ok = HandleTUN();
+        if (!ok) {
+          KL_ERROR(ok.Err().ToCString());
+        }
       }
     }
   }

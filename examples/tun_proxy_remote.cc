@@ -221,7 +221,8 @@ public:
       : stop_(false), ifname_(ifname), addr_(local_addr), port_min_(port_min),
         port_max_(port_max), port_(local_port), udp_nat_(port_min, port_max),
         tcp_nat_(port_min, port_max), sniffer_(ifname),
-        coding_(kale::DemoCoding()) {
+        coding_(kale::DemoCoding()), write_raw_fd_dropped_(0),
+        write_udp_fd_dropped_(0) {
     inet_aton(addr_.c_str(), &in_addr_);
   }
 
@@ -375,6 +376,8 @@ private:
   int raw_fd_;
   // kale::arcfour::Cipher cipher_;
   kale::Coding coding_;
+  uint64_t write_raw_fd_dropped_;
+  uint64_t write_udp_fd_dropped_;
 };
 
 void Proxy::EpollHandleTCP(const char *peer_addr, uint16_t peer_port,
@@ -412,6 +415,12 @@ void Proxy::EpollHandleTCP(const char *peer_addr, uint16_t peer_port,
            dst_port);
   auto send =
       kl::inet::Sendto(raw_fd_, packet, len, 0, dst_addr.c_str(), dst_port);
+  // record number of packets dropped
+  if (!send &&
+      (send.Err().Code() == EAGAIN || send.Err().Code() == EWOULDBLOCK)) {
+    uint64_t tmp = ++write_raw_fd_dropped_;
+    KL_ERROR("current write_raw_fd_dropped_: %u", tmp);
+  }
   if (!send && send.Err().Code() != EAGAIN &&
       send.Err().Code() != EWOULDBLOCK) {
     KL_ERROR(send.Err().ToCString());
@@ -564,6 +573,12 @@ void Proxy::SnifferSendBack(const char *addr, uint16_t port, const char *buf,
   coding_.Encode(reinterpret_cast<const uint8_t *>(buf), len, &data);
   auto send =
       kl::inet::Sendto(udp_fd_, data.data(), data.size(), 0, addr, port);
+  // record number of packets dropped
+  if (!send &&
+      (send.Err().Code() == EAGAIN || send.Err().Code() == EWOULDBLOCK)) {
+    uint64_t tmp = ++write_udp_fd_dropped_;
+    KL_ERROR("current write_udp_fd_dropped_: %u", tmp);
+  }
   if (!send && send.Err().Code() != EAGAIN &&
       send.Err().Code() != EWOULDBLOCK) {
     KL_ERROR(send.Err().ToCString());
