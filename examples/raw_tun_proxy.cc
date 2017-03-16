@@ -4,6 +4,7 @@
 
 #include <unistd.h>
 
+#include <atomic>
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -96,6 +97,8 @@ private:
   kl::Epoll epoll_;
   kale::Coding coding_;
   kl::Scheduler worker_pool_;
+  std::atomic<uint64_t> write_tun_dropped_;
+  std::atomic<uint64_t> write_udp_dropped_;
 };
 
 RawTunProxy::RawTunProxy(const char *inet_ifname, const char *inet_gateway,
@@ -105,7 +108,8 @@ RawTunProxy::RawTunProxy(const char *inet_ifname, const char *inet_gateway,
     : ifname_(ifname), addr_(addr), mask_(mask), mtu_(mtu),
       remote_host_(remote_host), remote_port_(remote_port), tun_fd_(-1),
       udp_fd_(-1), coding_(kale::DemoCoding()),
-      worker_pool_(std::thread::hardware_concurrency()) {
+      worker_pool_(std::thread::hardware_concurrency()), write_tun_dropped_(0),
+      write_udp_dropped_(0) {
   auto alloc_tun = kale::AllocateTun(ifname);
   if (!alloc_tun) {
     throw std::runtime_error(alloc_tun.Err().ToCString());
@@ -197,6 +201,12 @@ kl::Result<void> RawTunProxy::HandleTUN() {
     coding_.Encode(packet, len, &data);
     auto send = kl::inet::Sendto(udp_fd_, data.data(), data.size(), 0,
                                  remote_host_.c_str(), remote_port_);
+    // record number of packets dropped
+    if (!send &&
+        (send.Err().Code() == EAGAIN || send.Err().Code() == EWOULDBLOCK)) {
+      uint64_t tmp = ++write_udp_dropped_;
+      KL_ERROR("current write_udp_dropped: %u", tmp);
+    }
     if (!send && send.Err().Code() != EAGAIN &&
         send.Err().Code() != EWOULDBLOCK) {
       return kl::Err(send.MoveErr());
@@ -227,6 +237,11 @@ kl::Result<void> RawTunProxy::HandleUDP() {
     size_t len = data.size();
     StatIPPacket(packet, len);
     int nwrite = ::write(tun_fd_, packet, len);
+    // record number of packets dropped
+    if (nwrite < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+      uint64_t tmp = ++write_tun_dropped_;
+      KL_ERROR("current write_tun_dropped_: %u", tmp);
+    }
     if (nwrite < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
       return kl::Err(errno, std::strerror(errno));
     }
@@ -260,7 +275,6 @@ int RawTunProxy::EpollLoop() {
           auto ok = HandleUDP();
           if (!ok) {
             KL_ERROR(ok.Err().ToCString());
-            // return ok.Err().Code();
           }
         });
       }
@@ -269,7 +283,6 @@ int RawTunProxy::EpollLoop() {
           auto ok = HandleTUN();
           if (!ok) {
             KL_ERROR(ok.Err().ToCString());
-            // return ok.Err().Code();
           }
         });
       }
@@ -288,7 +301,8 @@ static void PrintUsage(int argc, char *argv[]) {
                        "    -a <tun_addr>\n"
                        "    -m <tun_mask>\n"
                        "    -d daemonize\n"
-                       "    -u <mtu> mtu\n",
+                       "    -u <mtu> mtu\n"
+                       "    -o <logfile> logfile\n",
                argv[0]);
 }
 
@@ -301,10 +315,15 @@ int main(int argc, char *argv[]) {
   std::string tun_addr("10.0.0.1");       // -a
   std::string tun_mask("255.255.255.0");  // -m
   uint16_t tun_mtu = 1380;                // -u
-  bool daemonize = false;
+  std::string log_file;                   // -o
+  bool daemonize = false;                 // -d
+  kl::env::Defer defer;                   // for some clean work
   int opt = 0;
-  while ((opt = ::getopt(argc, argv, "n:g:r:t:a:d:m:hdu:")) != -1) {
+  while ((opt = ::getopt(argc, argv, "n:g:r:t:a:i:m:hdo:u:")) != -1) {
     switch (opt) {
+      case 'o':
+        log_file = optarg;
+        break;
       case 'u': {
         tun_mtu = atoi(optarg);
         break;
@@ -372,6 +391,19 @@ int main(int argc, char *argv[]) {
                  inet_gateway.c_str());
     PrintUsage(argc, argv);
     ::exit(1);
+  }
+  if (!log_file.empty()) {
+    int fd = ::open(log_file.c_str(), O_CREAT | O_WRONLY, 0644);
+    if (fd < 0) {
+      KL_ERROR(std::strerror(errno));
+      ::exit(1);
+    }
+    defer([fd] { ::close(fd); });
+    kl::logging::Logger::SetDefaultLogger(kl::logging::Logger(
+        kl::logging::kError, [fd](const std::string &message) {
+          int nwrite = ::write(fd, message.data(), message.size());
+          (void)nwrite;
+        }));
   }
   RawTunProxy proxy(inet_ifname.c_str(), inet_gateway.c_str(), tun_name.c_str(),
                     tun_addr.c_str(), tun_mask.c_str(), tun_mtu,

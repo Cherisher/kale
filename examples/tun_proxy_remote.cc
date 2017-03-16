@@ -653,7 +653,8 @@ static void PrintUsage(int argc, char *argv[]) {
                "    -l <local_host:local_port> local listen address\n"
                "    -i <ifname> interface connected to inet\n"
                "    -r <port_start-port_end> port range to be reserved\n"
-               "    -d daemon\n",
+               "    -d daemon\n"
+               "    -o <logfile> logfile\n",
                argv[0]);
 }
 
@@ -662,10 +663,15 @@ int main(int argc, char *argv[]) {
   std::string host("0.0.0.0");
   uint16_t port = 4000;                         // -l
   uint16_t port_min = 60000, port_max = 60255;  // -r
-  bool daemonize = false;
+  std::string log_file;                         // -o
+  bool daemonize = false;                       // -d
+  kl::env::Defer defer;                         // for some clean work
   int opt = 0;
-  while ((opt = ::getopt(argc, argv, "i:l:r:hd")) != -1) {
+  while ((opt = ::getopt(argc, argv, "i:l:r:o:hd")) != -1) {
     switch (opt) {
+      case 'o':
+        log_file = optarg;
+        break;
       case 'd': {
         daemonize = true;
         break;
@@ -712,6 +718,19 @@ int main(int argc, char *argv[]) {
   if (!insert) {
     KL_ERROR(insert.Err().ToCString());
     ::exit(1);
+  }
+  if (!log_file.empty()) {
+    int fd = ::open(log_file.c_str(), O_CREAT | O_WRONLY, 0644);
+    if (fd < 0) {
+      KL_ERROR(std::strerror(errno));
+      ::exit(1);
+    }
+    defer([fd] { ::close(fd); });
+    kl::logging::Logger::SetDefaultLogger(kl::logging::Logger(
+        kl::logging::kError, [fd](const std::string &message) {
+          int nwrite = ::write(fd, message.data(), message.size());
+          (void)nwrite;
+        }));
   }
   Proxy proxy(ifname.c_str(), host.c_str(), port, port_min, port_max);
   auto run = proxy.Run();
