@@ -360,6 +360,7 @@ int main(int argc, char *argv[]) {
       ::exit(1);
     }
   }
+  kl::env::WritePidToFile("/tmp/raw_tun_proxy.pid");
   if (remote_host.empty() || remote_port == 0 ||
       !kl::inet::InetSockAddr(remote_host.c_str(), remote_port)) {
     std::fprintf(stderr, "%s: invalid remote host %s:%u\n", argv[0],
