@@ -6,7 +6,7 @@ LIBPCAP := libpcap
 LIBPCAP_LIB := libpcap.a
 CXX := g++
 CXXFLAGS := -Wall -g -std=c++14 -I$(LIBPCAP) -O2
-LDFLAGS := -lpthread -L. -lkale -lpcap -lkl
+LDFLAGS := -lpthread -L. -lkale -lpcap -lkl -ldbus-1
 STATICLIB := libkale.a
 OBJECTS := tun.o ip_packet.o sniffer.o resolver.o arcfour.o demo_coding.o
 TESTS := $(patsubst %.cc, %, $(wildcard *_test.cc))
