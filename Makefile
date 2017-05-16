@@ -2,22 +2,14 @@
 
 KL := kl
 KL_LIB := libkl.a
-LIBPCAP := libpcap
-LIBPCAP_LIB := libpcap.a
 CXX := g++
-CXXFLAGS := -Wall -g -std=c++14 -I$(LIBPCAP) -O2
+CXXFLAGS := -Wall -g -std=c++14 -O2
 LDFLAGS := -lpthread -L. -lkale -lpcap -lkl -ldbus-1
 STATICLIB := libkale.a
 OBJECTS := tun.o ip_packet.o sniffer.o resolver.o arcfour.o demo_coding.o
 TESTS := $(patsubst %.cc, %, $(wildcard *_test.cc))
 
 all: $(STATICLIB) $(TESTS)
-
-$(LIBPCAP_LIB): $(LIBPCAP)
-	@cd $< && ./configure && $(MAKE) && cp $@ ../
-
-$(LIBPCAP):
-	@git submodule update --remote $@
 
 $(KL_LIB): $(KL)
 	@cd $< && $(MAKE) all && cp libkl.a ../
@@ -31,7 +23,7 @@ $(KL):
 $(STATICLIB): $(OBJECTS)
 	@ar rcsv $@ $^
 
-$(TESTS): $(STATICLIB) $(KL_LIB) $(LIBPCAP_LIB)
+$(TESTS): $(STATICLIB) $(KL_LIB)
 
 $(TESTS): %_test: %_test.o
 	$(CXX) $(CXXFLAGS) $< -o $@ $(LDFLAGS)
