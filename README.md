@@ -7,4 +7,4 @@ In order to build this library, `flex` and `bison` are prerequisites. On ubuntu,
 `sudo apt install flex bison`. Then just compile it with command `bazel build examples`.
 
 # Examples
-`examples/raw_tun_proxy.cc` and `tun_proxy_remote.cc` demonstrate how to use this library to build a scalable L3 proxy.
+`examples/raw_tun_proxy.cc` and `examples/tun_proxy_remote.cc` demonstrate how to use this library to build a scalable L3 proxy.
