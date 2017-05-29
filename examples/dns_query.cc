@@ -2,10 +2,10 @@
 // Use of this source code is governed by the BSD license that can be found in
 // the LICENSE file.
 
+#include "kale/resolver.h"
 #include "kl/logger.h"
 #include "kl/netdev.h"
 #include "kl/udp.h"
-#include "resolver.h"
 
 int main() {
   const char *server = "8.8.8.8";

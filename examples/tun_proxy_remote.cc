@@ -11,10 +11,13 @@
 #include <string>
 #include <thread>
 
-#include "arcfour.h"
-#include "coding.h"
-#include "demo_coding.h"
-#include "ip_packet.h"
+#include "kale/arcfour.h"
+#include "kale/coding.h"
+#include "kale/demo_coding.h"
+#include "kale/ip_packet.h"
+#include "kale/lru.h"
+#include "kale/sniffer.h"
+#include "kale/tun.h"
 #include "kl/env.h"
 #include "kl/epoll.h"
 #include "kl/inet.h"
@@ -25,9 +28,6 @@
 #include "kl/tcp.h"
 #include "kl/udp.h"
 #include "kl/wait_group.h"
-#include "lru.h"
-#include "sniffer.h"
-#include "tun.h"
 
 namespace {
 
