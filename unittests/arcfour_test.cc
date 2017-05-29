@@ -2,10 +2,11 @@
 // Use of this source code is governed by the BSD license that can be found in
 // the LICENSE file.
 
-#include "arcfour.h"
-#include "ip_packet.h"
+#include "kale/arcfour.h"
+#include "kale/ip_packet.h"
 #include "kl/testkit.h"
 
+namespace {
 static uint8_t kKey[4] = {0xff, 0xbb, 0xcc, 0xdd};
 
 TEST(kale::arcfour::Cipher, Encryption, kKey, sizeof(kKey)) {
@@ -26,5 +27,4 @@ TEST(kale::arcfour::Cipher, Encryption, kKey, sizeof(kKey)) {
   ASSERT(check == message);
   ASSERT(check1 == message1);
 }
-
-int main() { return KL_TEST(); }
+}  // namespace

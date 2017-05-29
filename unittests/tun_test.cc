@@ -11,7 +11,8 @@
 #include <sstream>
 #include <thread>
 
-#include "ip_packet.h"
+#include "kale/ip_packet.h"
+#include "kale/tun.h"
 #include "kl/env.h"
 #include "kl/epoll.h"
 #include "kl/inet.h"
@@ -21,7 +22,8 @@
 #include "kl/testkit.h"
 #include "kl/udp.h"
 #include "kl/wait_group.h"
-#include "tun.h"
+
+namespace {
 
 class T {};
 
@@ -134,4 +136,4 @@ TEST(T, BindPort) {
   ASSERT(!kl::inet::Bind(fd1, "127.0.0.1", port));
 }
 
-int main() { return KL_TEST(); }
+}  // namespace

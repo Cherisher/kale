@@ -7,8 +7,8 @@
 #include <cstring>
 #include <stdexcept>
 
+#include "kale/sniffer.h"
 #include "kl/logger.h"
-#include "sniffer.h"
 
 namespace kale {
 

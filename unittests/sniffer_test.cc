@@ -5,12 +5,14 @@
 #include <chrono>
 #include <thread>
 
+#include "kale/sniffer.h"
 #include "kl/logger.h"
 #include "kl/netdev.h"
 #include "kl/string.h"
 #include "kl/testkit.h"
 #include "kl/udp.h"
-#include "sniffer.h"
+
+namespace {
 
 class T {};
 
@@ -114,4 +116,4 @@ TEST(T, Loop) {
   send_thread.join();
 }
 
-int main() { return KL_TEST(); }
+}  // namespace

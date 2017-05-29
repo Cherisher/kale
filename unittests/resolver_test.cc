@@ -2,12 +2,13 @@
 // Use of this source code is governed by the BSD license that can be found in
 // the LICENSE file.
 
-#include "resolver.h"
-#include "ip_packet.h"
+#include "kale/resolver.h"
+#include "kale/ip_packet.h"
 #include "kl/logger.h"
 #include "kl/testkit.h"
 #include "kl/udp.h"
 
+namespace {
 class T {};
 
 TEST(T, BuildQuery) {
@@ -53,4 +54,4 @@ TEST(T, Query) {
   }
 }
 
-int main() { return KL_TEST(); }
+}  // namespace

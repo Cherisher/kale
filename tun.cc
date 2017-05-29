@@ -13,10 +13,10 @@
 #include <cstring>
 #include <cstring>
 
+#include "kale/tun.h"
 #include "kl/netdev.h"
 #include "kl/random.h"
 #include "kl/string.h"
-#include "tun.h"
 
 namespace kale {
 

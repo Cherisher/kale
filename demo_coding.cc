@@ -2,8 +2,8 @@
 // Use of this source code is governed by the BSD license that can be found in
 // the LICENSE file.
 
-#include "demo_coding.h"
-#include "arcfour.h"
+#include "kale/demo_coding.h"
+#include "kale/arcfour.h"
 #include "kl/error.h"
 
 namespace kale {

@@ -6,7 +6,7 @@
 
 #include <iostream>
 
-#include "ip_packet.h"
+#include "kale/ip_packet.h"
 #include "kl/logger.h"
 
 namespace kale {

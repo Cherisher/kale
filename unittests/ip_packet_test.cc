@@ -2,10 +2,11 @@
 // Use of this source code is governed by the BSD license that can be found in
 // the LICENSE file.
 
-#include "ip_packet.h"
+#include "kale/ip_packet.h"
 #include "kl/logger.h"
 #include "kl/testkit.h"
 
+namespace {
 class T {};
 
 TEST(T, BuildNetworkBuffer0) {
@@ -50,4 +51,4 @@ TEST(T, BuildNetworkBuffer1) {
   ASSERT(len == 1);
 }
 
-int main() { return KL_TEST(); }
+}  // namespace

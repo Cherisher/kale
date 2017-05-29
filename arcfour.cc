@@ -4,7 +4,7 @@
 
 #include <algorithm>
 
-#include "arcfour.h"
+#include "kale/arcfour.h"
 
 namespace kale {
 namespace arcfour {

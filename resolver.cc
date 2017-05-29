@@ -6,12 +6,12 @@
 #include <thread>
 #include <unistd.h>
 
-#include "ip_packet.h"
+#include "kale/ip_packet.h"
+#include "kale/resolver.h"
 #include "kl/env.h"
 #include "kl/epoll.h"
 #include "kl/inet.h"
 #include "kl/logger.h"
-#include "resolver.h"
 
 namespace kale {
 

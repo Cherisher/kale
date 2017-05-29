@@ -5,9 +5,11 @@
 #include <algorithm>
 #include <vector>
 
+#include "kale/lru.h"
 #include "kl/logger.h"
 #include "kl/testkit.h"
-#include "lru.h"
+
+namespace {
 
 TEST(kale::LRU, Constructor, 16) {}
 
@@ -46,4 +48,4 @@ TEST(kale::LRU, GetLRU1, 16) {
   }
 }
 
-int main() { return KL_TEST(); }
+}  // namespace
