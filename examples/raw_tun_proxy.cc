@@ -318,7 +318,7 @@ int main(int argc, char *argv[]) {
   std::string passwd("\xc0\xde\xba\xbe");  // -p
   kl::env::Defer defer;                    // for some clean work
   int opt = 0;
-  while ((opt = ::getopt(argc, argv, "n:g:r:t:a:i:m:hdo:u:")) != -1) {
+  while ((opt = ::getopt(argc, argv, "n:g:r:t:a:i:m:hdo:u:p:")) != -1) {
     switch (opt) {
       case 'o':
         log_file = optarg;
