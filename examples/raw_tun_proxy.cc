@@ -16,14 +16,24 @@
 #include "kale/tun.h"
 #include "kl/env.h"
 #include "kl/epoll.h"
+#include "kl/hexdump.h"
 #include "kl/inet.h"
 #include "kl/logger.h"
 #include "kl/netdev.h"
 #include "kl/scheduler.h"
+#include "kl/slice.h"
 #include "kl/string.h"
 #include "kl/udp.h"
 
 namespace {
+
+void DumpErrorPacket(const char *packet_type, const uint8_t *packet,
+                     size_t len) {
+  std::string packet_dump;
+  kl::Slice s(reinterpret_cast<const char *>(packet), len);
+  kl::HexDump(s, &packet_dump);
+  KL_ERROR("%s packet dump: %s", packet_type, packet_dump.c_str());
+}
 
 void StatTCP(const uint8_t *packet, size_t len) {
   const uint8_t *segment = kale::ip_packet::SegmentBase(packet, len);
@@ -32,6 +42,7 @@ void StatTCP(const uint8_t *packet, size_t len) {
   if (actual_checksum != calc_checksum) {
     KL_ERROR("tcp actual_checksum: %u, calc_checksum: %u", actual_checksum,
              calc_checksum);
+    DumpErrorPacket("tcp", packet, len);
   }
   KL_DEBUG("tcp segment, src addr %s, dst addr %s, data length: %u",
            kale::ip_packet::TCPSrcAddr(packet, len).c_str(),
@@ -46,6 +57,7 @@ void StatUDP(const uint8_t *packet, size_t len) {
   if (actual_checksum != calc_checksum) {
     KL_ERROR("udp actual_checksum: %u, calc_checksum: %u", actual_checksum,
              calc_checksum);
+    DumpErrorPacket("udp", packet, len);
   }
   KL_DEBUG("udp segment, src addr %s, dst addr %s, data length: %u",
            kale::ip_packet::UDPSrcAddr(packet, len).c_str(),
@@ -59,6 +71,7 @@ void StatIPPacket(const uint8_t *packet, size_t len) {
   if (actual_checksum != calculated_checksum) {
     KL_ERROR("actual checksum: %u, calculated checksum: %u", actual_checksum,
              calculated_checksum);
+    DumpErrorPacket("ip", packet, len);
     return;
   }
   if (kale::ip_packet::IsTCP(packet, len)) {
