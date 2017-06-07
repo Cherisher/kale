@@ -32,10 +32,12 @@
 namespace {
 
 kl::Status InsertIptablesRules(uint16_t port_min, uint16_t port_max) {
-  static const char *kCheckRule = "iptables -C INPUT -s 0.0.0.0/0.0.0.0 -p %s "
-                                  "--dport %u -j DROP 2> /dev/null";
-  static const char *kInsertCommand = "iptables -A INPUT -s 0.0.0.0/0.0.0.0 -p "
-                                      "%s --dport %u -j DROP 2> /dev/null";
+  static const char *kCheckRule =
+      "iptables -C INPUT -s 0.0.0.0/0.0.0.0 -p %s "
+      "--dport %u -j DROP 2> /dev/null";
+  static const char *kInsertCommand =
+      "iptables -A INPUT -s 0.0.0.0/0.0.0.0 -p "
+      "%s --dport %u -j DROP 2> /dev/null";
   for (uint16_t i = port_min; i <= port_max; ++i) {
     auto check = kl::string::FormatString(kCheckRule, "udp", i);
     int ok = ::system(check.c_str());
@@ -110,7 +112,7 @@ void StatIPPacket(const uint8_t *packet, size_t len) {
 }
 
 class FdManager {
-public:
+ public:
   void AddFd(int fd) {
     assert(fd >= 0);
     set_.insert(fd);
@@ -122,7 +124,7 @@ public:
     }
   }
 
-private:
+ private:
   std::set<int> set_;
 };
 
@@ -132,9 +134,10 @@ const char *kHostAddrFormat = "%s:%u:%s:%u";
 // <peer_addr>:<subnet_addr> -> local_port
 // local_port -> <peer_addr>:<subnet_addr>
 class NAT {
-public:
+ public:
   NAT(uint16_t port_min, uint16_t port_max)
-      : port_min_(port_min), port_max_(port_max),
+      : port_min_(port_min),
+        port_max_(port_max),
         lru_(port_max - port_min + 1) {}
 
   // RETURNS: local port allocated
@@ -202,7 +205,7 @@ public:
         std::move(split[2]), static_cast<uint16_t>(atoi(split[3].c_str()))));
   }
 
-private:
+ private:
   int AllocatePort() {
     int n = port_min_ + lru_.GetLRU();
     assert(n >= port_min_ && n <= port_max_);
@@ -215,13 +218,21 @@ private:
 };
 
 class Proxy {
-public:
+ public:
   Proxy(const char *ifname, const char *local_addr, uint16_t local_port,
-        uint16_t port_min, uint16_t port_max)
-      : stop_(false), ifname_(ifname), addr_(local_addr), port_min_(port_min),
-        port_max_(port_max), port_(local_port), udp_nat_(port_min, port_max),
-        tcp_nat_(port_min, port_max), sniffer_(ifname),
-        coding_(kale::DemoCoding()), write_raw_fd_dropped_(0),
+        uint16_t port_min, uint16_t port_max, const char *key, size_t key_len)
+      : stop_(false),
+        ifname_(ifname),
+        addr_(local_addr),
+        port_min_(port_min),
+        port_max_(port_max),
+        port_(local_port),
+        udp_nat_(port_min, port_max),
+        tcp_nat_(port_min, port_max),
+        sniffer_(ifname),
+        coding_(
+            kale::DemoCoding(reinterpret_cast<const uint8_t *>(key), key_len)),
+        write_raw_fd_dropped_(0),
         write_udp_fd_dropped_(0) {
     inet_aton(addr_.c_str(), &in_addr_);
   }
@@ -241,7 +252,7 @@ public:
     return kl::Ok();
   }
 
-private:
+ private:
   void EpollWaitAndHandle();
   void SnifferWaitAndHandle();
   void SnifferSendBack(const char *addr, uint16_t port, const char *buf,
@@ -408,11 +419,11 @@ void Proxy::EpollHandleTCP(const char *peer_addr, uint16_t peer_port,
       .s_addr = kale::ip_packet::DstAddr(packet, len),
   }));
   uint16_t dst_port = ntohs(kale::ip_packet::TCPDstPort(packet, len));
-  KL_DEBUG("tcp segment from host %s:%u's subnet  %s:%u -> %s:%u now is %s:%u "
-           "-> %s:%u",
-           peer_addr, peer_port, subnet_addr.c_str(), subnet_port,
-           dst_addr.c_str(), dst_port, addr_.c_str(), port, dst_addr.c_str(),
-           dst_port);
+  KL_DEBUG(
+      "tcp segment from host %s:%u's subnet  %s:%u -> %s:%u now is %s:%u "
+      "-> %s:%u",
+      peer_addr, peer_port, subnet_addr.c_str(), subnet_port, dst_addr.c_str(),
+      dst_port, addr_.c_str(), port, dst_addr.c_str(), dst_port);
   auto send =
       kl::inet::Sendto(raw_fd_, packet, len, 0, dst_addr.c_str(), dst_port);
   // record number of packets dropped
@@ -455,11 +466,11 @@ void Proxy::EpollHandleUDP(const char *peer_addr, uint16_t peer_port,
       .s_addr = kale::ip_packet::DstAddr(packet, len),
   }));
   uint16_t dst_port = ntohs(kale::ip_packet::UDPDstPort(packet, len));
-  KL_DEBUG("udp segment from host %s:%u's subnet  %s:%u -> %s:%u now is %s:%u "
-           "-> %s:%u",
-           peer_addr, peer_port, subnet_addr.c_str(), subnet_port,
-           dst_addr.c_str(), dst_port, addr_.c_str(), port, dst_addr.c_str(),
-           dst_port);
+  KL_DEBUG(
+      "udp segment from host %s:%u's subnet  %s:%u -> %s:%u now is %s:%u "
+      "-> %s:%u",
+      peer_addr, peer_port, subnet_addr.c_str(), subnet_port, dst_addr.c_str(),
+      dst_port, addr_.c_str(), port, dst_addr.c_str(), dst_port);
   auto send =
       kl::inet::Sendto(raw_fd_, packet, len, 0, dst_addr.c_str(), dst_port);
   if (!send && send.Err().Code() != EAGAIN &&
@@ -669,7 +680,8 @@ static void PrintUsage(int argc, char *argv[]) {
                "    -i <ifname> interface connected to inet\n"
                "    -r <port_start-port_end> port range to be reserved\n"
                "    -d daemon\n"
-               "    -o <logfile> logfile\n",
+               "    -o <logfile> logfile\n"
+               "    -p <passwd> password\n",
                argv[0]);
 }
 
@@ -680,6 +692,7 @@ int main(int argc, char *argv[]) {
   uint16_t port_min = 60000, port_max = 60255;  // -r
   std::string log_file;                         // -o
   bool daemonize = false;                       // -d
+  std::string passwd("\xc0\xde\xba\xbe");       // -p
   kl::env::Defer defer;                         // for some clean work
   int opt = 0;
   while ((opt = ::getopt(argc, argv, "i:l:r:o:hd")) != -1) {
@@ -706,6 +719,10 @@ int main(int argc, char *argv[]) {
         port_min = atoi(split[0].c_str());
         port_max = atoi(split[1].c_str());
         assert(port_min <= port_max);
+        break;
+      }
+      case 'p': {
+        passwd = optarg;
         break;
       }
       case 'h':
@@ -747,7 +764,8 @@ int main(int argc, char *argv[]) {
           (void)nwrite;
         }));
   }
-  Proxy proxy(ifname.c_str(), host.c_str(), port, port_min, port_max);
+  Proxy proxy(ifname.c_str(), host.c_str(), port, port_min, port_max,
+              passwd.c_str(), passwd.size());
   auto run = proxy.Run();
   if (!run) {
     KL_ERROR(run.Err().ToCString());

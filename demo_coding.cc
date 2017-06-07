@@ -8,30 +8,18 @@
 
 namespace kale {
 
-namespace {
-
-uint8_t kKey[4] = {0xc0, 0xde, 0xc0, 0xde};
-
-kale::arcfour::Cipher cipher(kKey, sizeof(kKey));
-
-void Encode(const uint8_t *buffer, size_t len, std::vector<uint8_t> *encode) {
-  *encode = cipher.Encrypt(buffer, len);
-}
-
-kl::Status Decode(const uint8_t *buffer, size_t len,
-                  std::vector<uint8_t> *decode) {
-  *decode = cipher.Decrypt(buffer, len);
-  return kl::Ok();
-}
-
-}  // namespace (anonymous)
-
-Coding DemoCoding() {
+Coding DemoCoding(const uint8_t *key, size_t len) {
+  auto cipher = std::make_shared<arcfour::Cipher>(key, len);
   Coding ret;
-  ret.Encode = std::bind(&Encode, std::placeholders::_1, std::placeholders::_2,
-                         std::placeholders::_3);
-  ret.Decode = std::bind(&Decode, std::placeholders::_1, std::placeholders::_2,
-                         std::placeholders::_3);
+  ret.Encode = [cipher](const uint8_t *buffer, size_t len,
+                        std::vector<uint8_t> *encode) {
+    *encode = cipher->Decrypt(buffer, len);
+  };
+  ret.Decode = [cipher](const uint8_t *buffer, size_t len,
+                        std::vector<uint8_t> *decode) {
+    *decode = cipher->Decrypt(buffer, len);
+    return kl::Ok();
+  };
   return ret;
 }
 

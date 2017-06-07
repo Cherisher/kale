@@ -8,7 +8,7 @@
 
 namespace kale {
 
-Coding DemoCoding();
+Coding DemoCoding(const uint8_t *key, size_t len);
 
 }  // namespace kale
 

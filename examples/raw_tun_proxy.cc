@@ -70,10 +70,11 @@ void StatIPPacket(const uint8_t *packet, size_t len) {
 }
 
 class RawTunProxy {
-public:
+ public:
   RawTunProxy(const char *inet_ifname, const char *inet_gateway,
               const char *ifname, const char *addr, const char *mask,
-              uint16_t mtu, const char *remote_host, uint16_t remote_port);
+              uint16_t mtu, const char *remote_host, uint16_t remote_port,
+              const char *key, size_t key_len);
 
   int Run();
   ~RawTunProxy() {
@@ -85,7 +86,7 @@ public:
     }
   }
 
-private:
+ private:
   int EpollLoop();
   kl::Result<void> HandleTUN();
   kl::Result<void> HandleUDP();
@@ -103,10 +104,18 @@ private:
 RawTunProxy::RawTunProxy(const char *inet_ifname, const char *inet_gateway,
                          const char *ifname, const char *addr, const char *mask,
                          uint16_t mtu, const char *remote_host,
-                         uint16_t remote_port)
-    : ifname_(ifname), addr_(addr), mask_(mask), mtu_(mtu),
-      remote_host_(remote_host), remote_port_(remote_port), tun_fd_(-1),
-      udp_fd_(-1), coding_(kale::DemoCoding()), write_tun_dropped_(0),
+                         uint16_t remote_port, const char *key, size_t key_len)
+    : ifname_(ifname),
+      addr_(addr),
+      mask_(mask),
+      mtu_(mtu),
+      remote_host_(remote_host),
+      remote_port_(remote_port),
+      tun_fd_(-1),
+      udp_fd_(-1),
+      coding_(
+          kale::DemoCoding(reinterpret_cast<const uint8_t *>(key), key_len)),
+      write_tun_dropped_(0),
       write_udp_dropped_(0) {
   auto alloc_tun = kale::AllocateTun(ifname);
   if (!alloc_tun) {
@@ -280,31 +289,34 @@ int RawTunProxy::EpollLoop() {
 }  // namespace (anonymous)
 
 static void PrintUsage(int argc, char *argv[]) {
-  std::fprintf(stderr, "%s:\n"
-                       "    -n <inet_interface>\n"
-                       "    -g <inet_gateway>\n"
-                       "    -r <remote_host:remote_port>\n"
-                       "    -i <tun_name>\n"
-                       "    -a <tun_addr>\n"
-                       "    -m <tun_mask>\n"
-                       "    -d daemonize\n"
-                       "    -u <mtu> mtu\n"
-                       "    -o <logfile> logfile\n",
+  std::fprintf(stderr,
+               "%s:\n"
+               "    -n <inet_interface>\n"
+               "    -g <inet_gateway>\n"
+               "    -r <remote_host:remote_port>\n"
+               "    -i <tun_name>\n"
+               "    -a <tun_addr>\n"
+               "    -m <tun_mask>\n"
+               "    -d daemonize\n"
+               "    -u <mtu> mtu\n"
+               "    -o <logfile> logfile\n"
+               "    -p <passwd> password\n",
                argv[0]);
 }
 
 int main(int argc, char *argv[]) {
   std::string remote_host;
-  uint16_t remote_port = 0;               // -r
-  std::string inet_ifname;                // -n
-  std::string inet_gateway;               // -g
-  std::string tun_name("tun0");           // -i
-  std::string tun_addr("10.0.0.1");       // -a
-  std::string tun_mask("255.255.255.0");  // -m
-  uint16_t tun_mtu = 1380;                // -u
-  std::string log_file;                   // -o
-  bool daemonize = false;                 // -d
-  kl::env::Defer defer;                   // for some clean work
+  uint16_t remote_port = 0;                // -r
+  std::string inet_ifname;                 // -n
+  std::string inet_gateway;                // -g
+  std::string tun_name("tun0");            // -i
+  std::string tun_addr("10.0.0.1");        // -a
+  std::string tun_mask("255.255.255.0");   // -m
+  uint16_t tun_mtu = 1380;                 // -u
+  std::string log_file;                    // -o
+  bool daemonize = false;                  // -d
+  std::string passwd("\xc0\xde\xba\xbe");  // -p
+  kl::env::Defer defer;                    // for some clean work
   int opt = 0;
   while ((opt = ::getopt(argc, argv, "n:g:r:t:a:i:m:hdo:u:")) != -1) {
     switch (opt) {
@@ -345,6 +357,10 @@ int main(int argc, char *argv[]) {
       }
       case 'm': {
         tun_mask = optarg;
+        break;
+      }
+      case 'p': {
+        passwd = optarg;
         break;
       }
       case 'h':
@@ -395,6 +411,7 @@ int main(int argc, char *argv[]) {
   }
   RawTunProxy proxy(inet_ifname.c_str(), inet_gateway.c_str(), tun_name.c_str(),
                     tun_addr.c_str(), tun_mask.c_str(), tun_mtu,
-                    remote_host.c_str(), remote_port);
+                    remote_host.c_str(), remote_port, passwd.c_str(),
+                    passwd.size());
   return proxy.Run();
 }
