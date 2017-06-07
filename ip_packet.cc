@@ -117,6 +117,9 @@ void ChangeTCPDstPort(uint8_t *packet, size_t len, uint16_t port) {
 }
 
 uint32_t ChecksumCarry(uint32_t x) {
+  if (x == 0) {
+    return 0;
+  }
   while (x >> 16) {
     x = (x & 0xffff) + (x >> 16);
   }
