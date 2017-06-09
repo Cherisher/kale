@@ -6,12 +6,12 @@
 
 #include <iostream>
 
-#include "kale/ip_packet.h"
+#include "kale/ip.h"
 #include "kl/logger.h"
 
 namespace kale {
 // https://en.wikipedia.org/wiki/IPv4
-namespace ip_packet {
+namespace ip {
 
 uint16_t IPHeaderLength(const uint8_t *packet, size_t len) {
   return (0x0f & packet[0]) << 2;
@@ -343,5 +343,5 @@ size_t UDPDataLength(const uint8_t *packet, size_t len) {
   return len - IPHeaderLength(packet, len) - UDPHeaderLength(packet, len);
 }
 
-}  // namespace ip_packet
+}  // namespace ip
 }  // namespace kale

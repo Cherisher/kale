@@ -11,7 +11,7 @@
 #include <sstream>
 #include <thread>
 
-#include "kale/ip_packet.h"
+#include "kale/ip.h"
 #include "kale/tun.h"
 #include "kl/env.h"
 #include "kl/epoll.h"
@@ -84,29 +84,29 @@ TEST(T, ReadWriteTun) {
     uint8_t *packet = reinterpret_cast<uint8_t *>(buf);
     size_t len = nread;
     // protocol type
-    ASSERT(kale::ip_packet::IsUDP(packet, len));
+    ASSERT(kale::ip::IsUDP(packet, len));
     // header check sum
     // KL_DEBUG("ip header actual checksum: %u",
     //          *reinterpret_cast<uint16_t *>(packet + 10));
     // KL_DEBUG("ip header checksum calculated: %u",
-    //          kale::ip_packet::IPHeaderChecksum(packet, len));
+    //          kale::ip::IPHeaderChecksum(packet, len));
     ASSERT(*reinterpret_cast<uint16_t *>(buf + 10) ==
-           kale::ip_packet::IPHeaderChecksum(packet, len));
+           kale::ip::IPHeaderChecksum(packet, len));
     // udp check sum
-    uint8_t *segment = kale::ip_packet::SegmentBase(packet, len);
-    // KL_DEBUG("src port %u", kale::ip_packet::UDPSrcPort(packet, len));
-    // KL_DEBUG("dst port %u", kale::ip_packet::UDPDstPort(packet, len));
+    uint8_t *segment = kale::ip::SegmentBase(packet, len);
+    // KL_DEBUG("src port %u", kale::ip::UDPSrcPort(packet, len));
+    // KL_DEBUG("dst port %u", kale::ip::UDPDstPort(packet, len));
     uint16_t checksum = *reinterpret_cast<const uint16_t *>(segment + 6);
     // KL_DEBUG("udp actual checksum: %u", checksum);
     // KL_DEBUG("udp checksum calculated: %u",
-    //             kale::ip_packet::UDPChecksum(packet, len));
-    ASSERT(checksum == kale::ip_packet::UDPChecksum(packet, len));
+    //             kale::ip::UDPChecksum(packet, len));
+    ASSERT(checksum == kale::ip::UDPChecksum(packet, len));
     buf[nread] = '\0';
     ASSERT(std::string(buf + 28) == message);
     // swap src/dst
-    kale::ip_packet::UDPEcho(packet, nread);
-    kale::ip_packet::UDPFillChecksum(packet, nread);
-    kale::ip_packet::IPFillChecksum(packet, nread);
+    kale::ip::UDPEcho(packet, nread);
+    kale::ip::UDPFillChecksum(packet, nread);
+    kale::ip::IPFillChecksum(packet, nread);
     // KL_DEBUG("writing to tun");
     int nwrite = ::write(tun_fd, buf, nread);
     // KL_DEBUG("write %d bytes back to tun", nwrite);

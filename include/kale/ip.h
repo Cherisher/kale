@@ -3,12 +3,12 @@
 // the LICENSE file.
 
 // Some routines operating on IP packets.
-#ifndef KALE_IP_PACKET_H_
-#define KALE_IP_PACKET_H_
+#ifndef KALE_IP_H_
+#define KALE_IP_H_
 #include "kl/error.h"
 
 namespace kale {
-namespace ip_packet {
+namespace ip {
 // All these functions won't validate packet.
 bool IsUDP(const uint8_t *packet, size_t len);
 bool IsTCP(const uint8_t *packet, size_t len);

@@ -6,7 +6,7 @@
 #include <thread>
 #include <unistd.h>
 
-#include "kale/ip_packet.h"
+#include "kale/ip.h"
 #include "kale/resolver.h"
 #include "kl/env.h"
 #include "kl/epoll.h"
@@ -272,7 +272,7 @@ std::vector<uint8_t> Resolver::BuildQuery(const char *name,
                                           uint16_t transaction_id) {
   std::vector<uint8_t> result;
   uint8_t header[12];
-  int len = ip_packet::BuildNetworkBuffer(header, sizeof(header), "wbbwwww",
+  int len = ip::BuildNetworkBuffer(header, sizeof(header), "wbbwwww",
                                           htons(transaction_id), 0x01, 0x00,
                                           htons(1), 0, 0, 0);
   assert(len == 12);

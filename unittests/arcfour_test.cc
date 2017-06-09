@@ -3,7 +3,7 @@
 // the LICENSE file.
 
 #include "kale/arcfour.h"
-#include "kale/ip_packet.h"
+#include "kale/ip.h"
 #include "kl/testkit.h"
 
 namespace {
@@ -19,7 +19,7 @@ TEST(kale::arcfour::Cipher, Encryption, kKey, sizeof(kKey)) {
   const std::string message1("Linear in the distance between first and last ");
   auto enc1 = Encrypt(reinterpret_cast<const uint8_t *>(message1.data()),
                       message1.size());
-  // kale::ip_packet::Dump(stderr, enc.data(), enc.size());
+  // kale::ip::Dump(stderr, enc.data(), enc.size());
   auto dec = Decrypt(enc.data(), enc.size());
   std::string check(dec.begin(), dec.end());
   auto dec1 = Decrypt(enc1.data(), enc1.size());

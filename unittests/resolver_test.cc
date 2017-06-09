@@ -3,7 +3,7 @@
 // the LICENSE file.
 
 #include "kale/resolver.h"
-#include "kale/ip_packet.h"
+#include "kale/ip.h"
 #include "kl/logger.h"
 #include "kl/testkit.h"
 #include "kl/udp.h"
@@ -25,7 +25,7 @@ TEST(T, BuildQuery) {
 TEST(T, DNSName) {
   uint8_t buf[65536];
   int len;
-  len = kale::ip_packet::BuildNetworkBuffer(buf, sizeof(buf), "bsbsbsb", 0x03,
+  len = kale::ip::BuildNetworkBuffer(buf, sizeof(buf), "bsbsbsb", 0x03,
                                             "www", 0x06, "google", 0x03, "com",
                                             0x0);
   std::string name = kale::Resolver::DNSName("www.google.com");
