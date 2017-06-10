@@ -8,11 +8,14 @@
 #include <cstdlib>
 #include <iostream>
 #include <string>
+#include <vector>
 
 #include "kale/arcfour.h"
 #include "kale/coding.h"
 #include "kale/demo_coding.h"
-#include "kale/ip.h"
+#include "kale/ipv4.h"
+#include "kale/ipv4_tcp.h"
+#include "kale/ipv4_udp.h"
 #include "kale/tun.h"
 #include "kl/env.h"
 #include "kl/epoll.h"
@@ -36,48 +39,72 @@ void DumpErrorPacket(const char *packet_type, const uint8_t *packet,
 }
 
 void StatTCP(const uint8_t *packet, size_t len) {
-  const uint8_t *segment = kale::ip::SegmentBase(packet, len);
-  uint16_t actual_checksum = *reinterpret_cast<const uint16_t *>(segment + 16);
-  uint16_t calc_checksum = kale::ip::TCPChecksum(packet, len);
+  std::vector<uint8_t> duplex(packet, packet + len);
+  kale::ipv4::PacketEditor editor(duplex.data(), duplex.size());
+  auto tcp_editor = editor.CreateTCPSegmentEditor();
+  if (!tcp_editor) {
+    KL_ERROR("Packet doesn't contain tcp segment...");
+    DumpErrorPacket("ip", packet, len);
+    return;
+  }
+  uint16_t actual_checksum = tcp_editor->ref().rep->checksum;
+  tcp_editor->FillChecksum();
+  uint16_t calc_checksum = tcp_editor->ref().rep->checksum;
   if (actual_checksum != calc_checksum) {
     KL_ERROR("tcp actual_checksum: %u, calc_checksum: %u", actual_checksum,
              calc_checksum);
     DumpErrorPacket("tcp", packet, len);
   }
-  KL_DEBUG("tcp segment, src addr %s, dst addr %s, data length: %u",
-           kale::ip::TCPSrcAddr(packet, len).c_str(),
-           kale::ip::TCPDstAddr(packet, len).c_str(),
-           kale::ip::TCPDataLength(packet, len));
+  // KL_DEBUG("tcp segment, src addr %s, dst addr %s, data length: %u",
+  //          kale::ip::TCPSrcAddr(packet, len).c_str(),
+  //          kale::ip::TCPDstAddr(packet, len).c_str(),
+  //          kale::ip::TCPDataLength(packet, len));
 }
 
 void StatUDP(const uint8_t *packet, size_t len) {
-  const uint8_t *segment = kale::ip::SegmentBase(packet, len);
-  uint16_t actual_checksum = *reinterpret_cast<const uint16_t *>(segment + 6);
-  uint16_t calc_checksum = kale::ip::UDPChecksum(packet, len);
+  std::vector<uint8_t> duplex(packet, packet + len);
+  kale::ipv4::PacketEditor editor(duplex.data(), duplex.size());
+  auto udp_editor = editor.CreateUDPSegmentEditor();
+  if (!udp_editor) {
+    KL_ERROR("Packet doesn't contain udp segment...");
+    DumpErrorPacket("ip", packet, len);
+    return;
+  }
+  uint16_t actual_checksum = udp_editor->ref().rep->checksum;
+  udp_editor->FillChecksum();
+  uint16_t calc_checksum = udp_editor->ref().rep->checksum;
   if (actual_checksum != calc_checksum) {
     KL_ERROR("udp actual_checksum: %u, calc_checksum: %u", actual_checksum,
              calc_checksum);
     DumpErrorPacket("udp", packet, len);
   }
-  KL_DEBUG("udp segment, src addr %s, dst addr %s, data length: %u",
-           kale::ip::UDPSrcAddr(packet, len).c_str(),
-           kale::ip::UDPDstAddr(packet, len).c_str(),
-           kale::ip::UDPDataLength(packet, len));
+  // KL_DEBUG("udp segment, src addr %s, dst addr %s, data length: %u",
+  //          kale::ip::UDPSrcAddr(packet, len).c_str(),
+  //          kale::ip::UDPDstAddr(packet, len).c_str(),
+  //          kale::ip::UDPDataLength(packet, len));
 }
 
 void StatIPPacket(const uint8_t *packet, size_t len) {
-  uint16_t actual_checksum = *reinterpret_cast<const uint16_t *>(packet + 10);
-  uint16_t calculated_checksum = kale::ip::IPHeaderChecksum(packet, len);
+  std::vector<uint8_t> duplex(packet, packet + len);
+  kale::ipv4::PacketEditor editor(duplex.data(), duplex.size());
+  if (editor.ref().rep->version != 4) {
+    KL_ERROR("Not IP version %u not supported yet", editor.ref().rep->version);
+    DumpErrorPacket("ip", packet, len);
+    return;
+  }
+  uint16_t actual_checksum = editor.ref().rep->checksum;
+  editor.FillChecksum();
+  uint16_t calculated_checksum = editor.ref().rep->checksum;
   if (actual_checksum != calculated_checksum) {
     KL_ERROR("actual checksum: %u, calculated checksum: %u", actual_checksum,
              calculated_checksum);
     DumpErrorPacket("ip", packet, len);
     return;
   }
-  if (kale::ip::IsTCP(packet, len)) {
+  if (editor.ref().IsTCP()) {
     StatTCP(packet, len);
   }
-  if (kale::ip::IsUDP(packet, len)) {
+  if (editor.ref().IsUDP()) {
     StatUDP(packet, len);
   }
 }
