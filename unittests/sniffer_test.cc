@@ -39,7 +39,7 @@ TEST(T, UDPDump) {
   const std::string message("wtf~imfao~rofl");
   const char *ifname = "lo";
   const uint16_t port = 4000;
-  const int kNumOfPackets = 1 << 20;
+  const int kNumOfPackets = 1 << 12;
   kale::Sniffer sniffer("lo");
   auto compile = sniffer.CompileAndInstall(
       kl::string::FormatString("udp and port %u", port).c_str());
@@ -77,7 +77,7 @@ TEST(T, Loop) {
   const std::string message("wtf~imfao~rofl");
   const char *ifname = "lo";
   const uint16_t port = 4000;
-  const int kNumOfPackets = 1 << 20;
+  const int kNumOfPackets = 1 << 12;
   kale::Sniffer sniffer("lo");
   auto compile = sniffer.CompileAndInstall(
       kl::string::FormatString("udp and port %u", port).c_str());
