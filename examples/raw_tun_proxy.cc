@@ -88,7 +88,7 @@ void StatIPPacket(const uint8_t *packet, size_t len) {
   std::vector<uint8_t> duplex(packet, packet + len);
   kale::ipv4::PacketEditor editor(duplex.data(), duplex.size());
   if (editor.ref().rep->version != 4) {
-    KL_ERROR("Not IP version %u not supported yet", editor.ref().rep->version);
+    KL_ERROR("IP version %u not supported yet", editor.ref().rep->version);
     DumpErrorPacket("ip", packet, len);
     return;
   }
