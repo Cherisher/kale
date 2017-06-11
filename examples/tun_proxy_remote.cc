@@ -14,11 +14,16 @@
 #include "kale/arcfour.h"
 #include "kale/coding.h"
 #include "kale/demo_coding.h"
-#include "kale/ip.h"
+// #include "kale/ip.h"
+#include "kale/ipv4.h"
+#include "kale/ipv4_tcp.h"
+#include "kale/ipv4_udp.h"
 #include "kale/lru.h"
 #include "kale/sniffer.h"
 #include "kale/tun.h"
 #include "kl/env.h"
+#include "kl/slice.h"
+#include "kl/hexdump.h"
 #include "kl/epoll.h"
 #include "kl/inet.h"
 #include "kl/logger.h"
@@ -65,48 +70,81 @@ kl::Status InsertIptablesRules(uint16_t port_min, uint16_t port_max) {
   return kl::Ok();
 }
 
+void DumpErrorPacket(const char *packet_type, const uint8_t *packet,
+                     size_t len) {
+  std::string packet_dump;
+  kl::Slice s(reinterpret_cast<const char *>(packet), len);
+  kl::HexDump(s, &packet_dump);
+  KL_ERROR("%s packet dump: %s", packet_type, packet_dump.c_str());
+}
+
 void StatTCP(const uint8_t *packet, size_t len) {
-  const uint8_t *segment = kale::ip::SegmentBase(packet, len);
-  uint16_t actual_checksum = *reinterpret_cast<const uint16_t *>(segment + 16);
-  uint16_t calculated_checksum = kale::ip::TCPChecksum(packet, len);
-  if (actual_checksum != calculated_checksum) {
-    KL_ERROR("actual checksum: %u, calculated checksum: %u", actual_checksum,
-             calculated_checksum);
+  std::vector<uint8_t> duplex(packet, packet + len);
+  kale::ipv4::PacketEditor editor(duplex.data(), duplex.size());
+  auto tcp_editor = editor.CreateTCPSegmentEditor();
+  if (!tcp_editor) {
+    KL_ERROR("Packet doesn't contain tcp segment...");
+    DumpErrorPacket("ip", packet, len);
     return;
   }
-  KL_DEBUG("tcp segment, src addr %s, dst addr %s, data length: %u",
-           kale::ip::TCPSrcAddr(packet, len).c_str(),
-           kale::ip::TCPDstAddr(packet, len).c_str(),
-           kale::ip::TCPDataLength(packet, len));
+  uint16_t actual_checksum = tcp_editor->ref().rep->checksum;
+  tcp_editor->FillChecksum();
+  uint16_t calc_checksum = tcp_editor->ref().rep->checksum;
+  if (actual_checksum != calc_checksum) {
+    KL_ERROR("tcp actual_checksum: %u, calc_checksum: %u", actual_checksum,
+             calc_checksum);
+    DumpErrorPacket("tcp", packet, len);
+  }
+  // KL_DEBUG("tcp segment, src addr %s, dst addr %s, data length: %u",
+  //          kale::ip::TCPSrcAddr(packet, len).c_str(),
+  //          kale::ip::TCPDstAddr(packet, len).c_str(),
+  //          kale::ip::TCPDataLength(packet, len));
 }
 
 void StatUDP(const uint8_t *packet, size_t len) {
-  const uint8_t *segment = kale::ip::SegmentBase(packet, len);
-  uint16_t actual_checksum = *reinterpret_cast<const uint16_t *>(segment + 6);
-  uint16_t calculated_checksum = kale::ip::UDPChecksum(packet, len);
-  if (actual_checksum != calculated_checksum) {
-    KL_ERROR("actual checksum: %u, calculated checksum: %u", actual_checksum,
-             calculated_checksum);
+  std::vector<uint8_t> duplex(packet, packet + len);
+  kale::ipv4::PacketEditor editor(duplex.data(), duplex.size());
+  auto udp_editor = editor.CreateUDPSegmentEditor();
+  if (!udp_editor) {
+    KL_ERROR("Packet doesn't contain udp segment...");
+    DumpErrorPacket("ip", packet, len);
     return;
   }
-  KL_DEBUG("udp segment, src addr %s, dst addr %s, data length: %u",
-           kale::ip::UDPSrcAddr(packet, len).c_str(),
-           kale::ip::UDPDstAddr(packet, len).c_str(),
-           kale::ip::UDPDataLength(packet, len));
+  uint16_t actual_checksum = udp_editor->ref().rep->checksum;
+  udp_editor->FillChecksum();
+  uint16_t calc_checksum = udp_editor->ref().rep->checksum;
+  if (actual_checksum != calc_checksum) {
+    KL_ERROR("udp actual_checksum: %u, calc_checksum: %u", actual_checksum,
+             calc_checksum);
+    DumpErrorPacket("udp", packet, len);
+  }
+  // KL_DEBUG("udp segment, src addr %s, dst addr %s, data length: %u",
+  //          kale::ip::UDPSrcAddr(packet, len).c_str(),
+  //          kale::ip::UDPDstAddr(packet, len).c_str(),
+  //          kale::ip::UDPDataLength(packet, len));
 }
 
 void StatIPPacket(const uint8_t *packet, size_t len) {
-  uint16_t actual_checksum = *reinterpret_cast<const uint16_t *>(packet + 10);
-  uint16_t calculated_checksum = kale::ip::IPHeaderChecksum(packet, len);
+  std::vector<uint8_t> duplex(packet, packet + len);
+  kale::ipv4::PacketEditor editor(duplex.data(), duplex.size());
+  if (editor.ref().rep->version != 4) {
+    KL_ERROR("IP version %u not supported yet", editor.ref().rep->version);
+    DumpErrorPacket("ip", packet, len);
+    return;
+  }
+  uint16_t actual_checksum = editor.ref().rep->checksum;
+  editor.FillChecksum();
+  uint16_t calculated_checksum = editor.ref().rep->checksum;
   if (actual_checksum != calculated_checksum) {
     KL_ERROR("actual checksum: %u, calculated checksum: %u", actual_checksum,
              calculated_checksum);
+    DumpErrorPacket("ip", packet, len);
     return;
   }
-  if (kale::ip::IsTCP(packet, len)) {
+  if (editor.ref().IsTCP()) {
     StatTCP(packet, len);
   }
-  if (kale::ip::IsUDP(packet, len)) {
+  if (editor.ref().IsUDP()) {
     StatUDP(packet, len);
   }
 }
@@ -393,10 +431,15 @@ class Proxy {
 
 void Proxy::EpollHandleTCP(const char *peer_addr, uint16_t peer_port,
                            uint8_t *packet, size_t len) {
+  kale::ipv4::PacketEditor editor(packet, len);
   std::string subnet_addr(inet_ntoa(in_addr{
-      .s_addr = kale::ip::SrcAddr(packet, len),
+      // .s_addr = kale::ip::SrcAddr(packet, len),
+      .s_addr = editor.ref().rep->source_addr,
   }));
-  uint16_t subnet_port = ntohs(kale::ip::TCPSrcPort(packet, len));
+  auto tcp_editor = editor.CreateTCPSegmentEditor();
+  assert(tcp_editor);
+  // uint16_t subnet_port = ntohs(kale::ip::TCPSrcPort(packet, len));
+  uint16_t subnet_port = ntohs(tcp_editor->ref().rep->source_port);
   auto query = tcp_nat_.QueryPort(peer_addr, peer_port, subnet_addr.c_str(),
                                   subnet_port);
   uint16_t port = 0;
@@ -411,14 +454,20 @@ void Proxy::EpollHandleTCP(const char *peer_addr, uint16_t peer_port,
     port = *query;
   }
   assert(port > 0);
-  kale::ip::ChangeSrcAddr(packet, len, in_addr_.s_addr);
-  kale::ip::ChangeTCPSrcPort(packet, len, htons(port));
-  kale::ip::TCPFillChecksum(packet, len);
-  kale::ip::IPFillChecksum(packet, len);
+  // kale::ip::ChangeSrcAddr(packet, len, in_addr_.s_addr);
+  editor.ChangeSourceAddr(in_addr_.s_addr);
+  // kale::ip::ChangeTCPSrcPort(packet, len, htons(port));
+  tcp_editor->ChangeSourcePort(htons(port));
+  // kale::ip::TCPFillChecksum(packet, len);
+  tcp_editor->FillChecksum();
+  // kale::ip::IPFillChecksum(packet, len);
+  editor.FillChecksum();
   std::string dst_addr(inet_ntoa(in_addr{
-      .s_addr = kale::ip::DstAddr(packet, len),
+      // .s_addr = kale::ip::DstAddr(packet, len),
+      .s_addr = editor.ref().rep->dest_addr,
   }));
-  uint16_t dst_port = ntohs(kale::ip::TCPDstPort(packet, len));
+  // uint16_t dst_port = ntohs(kale::ip::TCPDstPort(packet, len));
+  uint16_t dst_port = ntohs(tcp_editor->ref().rep->dest_port);
   KL_DEBUG(
       "tcp segment from host %s:%u's subnet  %s:%u -> %s:%u now is %s:%u "
       "-> %s:%u",
@@ -440,10 +489,15 @@ void Proxy::EpollHandleTCP(const char *peer_addr, uint16_t peer_port,
 
 void Proxy::EpollHandleUDP(const char *peer_addr, uint16_t peer_port,
                            uint8_t *packet, size_t len) {
+  kale::ipv4::PacketEditor editor(packet, len);
+  auto udp_editor = editor.CreateUDPSegmentEditor();
+  assert(udp_editor);
   std::string subnet_addr(inet_ntoa(in_addr{
-      .s_addr = kale::ip::SrcAddr(packet, len),
+      // .s_addr = kale::ip::SrcAddr(packet, len),
+      .s_addr = editor.ref().rep->source_addr,
   }));
-  uint16_t subnet_port = ntohs(kale::ip::UDPSrcPort(packet, len));
+  // uint16_t subnet_port = ntohs(kale::ip::UDPSrcPort(packet, len));
+  uint16_t subnet_port = ntohs(udp_editor->ref().rep->source_port);
   auto query = udp_nat_.QueryPort(peer_addr, peer_port, subnet_addr.c_str(),
                                   subnet_port);
   uint16_t port = 0;
@@ -458,14 +512,20 @@ void Proxy::EpollHandleUDP(const char *peer_addr, uint16_t peer_port,
     port = *query;
   }
   assert(port > 0);
-  kale::ip::ChangeSrcAddr(packet, len, in_addr_.s_addr);
-  kale::ip::ChangeUDPSrcPort(packet, len, htons(port));
-  kale::ip::UDPFillChecksum(packet, len);
-  kale::ip::IPFillChecksum(packet, len);
+  // kale::ip::ChangeSrcAddr(packet, len, in_addr_.s_addr);
+  editor.ChangeSourceAddr(in_addr_.s_addr);
+  // kale::ip::ChangeUDPSrcPort(packet, len, htons(port));
+  udp_editor->ChangeSourcePort(htons(port));
+  // kale::ip::UDPFillChecksum(packet, len);
+  udp_editor->FillChecksum();
+  // kale::ip::IPFillChecksum(packet, len);
+  editor.FillChecksum();
   std::string dst_addr(inet_ntoa(in_addr{
-      .s_addr = kale::ip::DstAddr(packet, len),
+      // .s_addr = kale::ip::DstAddr(packet, len),
+      .s_addr = editor.ref().rep->dest_addr,
   }));
-  uint16_t dst_port = ntohs(kale::ip::UDPDstPort(packet, len));
+  // uint16_t dst_port = ntohs(kale::ip::UDPDstPort(packet, len));
+  uint16_t dst_port = ntohs(udp_editor->ref().rep->dest_port);
   KL_DEBUG(
       "udp segment from host %s:%u's subnet  %s:%u -> %s:%u now is %s:%u "
       "-> %s:%u",
@@ -507,9 +567,10 @@ void Proxy::OnUDPRecvFromPeer() {
     ::memcpy(buf, data.data(), data.size());
     uint8_t *packet = reinterpret_cast<uint8_t *>(buf);
     const size_t len = data.size();
-    if (kale::ip::IsTCP(packet, len)) {
+    kale::ipv4::PacketRef packet_ref(packet, len);
+    if (packet_ref.IsTCP()) {
       EpollHandleTCP(peer_addr.c_str(), peer_port, packet, len);
-    } else if (kale::ip::IsUDP(packet, len)) {
+    } else if (packet_ref.IsUDP()) {
       EpollHandleUDP(peer_addr.c_str(), peer_port, packet, len);
     }
   }
@@ -571,9 +632,10 @@ void Proxy::SnifferWaitAndHandle() {
   if (packet == nullptr) {
     return;
   }
-  if (kale::ip::IsTCP(packet, len)) {
+  kale::ipv4::PacketRef packet_ref(packet, len);
+  if (packet_ref.IsTCP()) {
     SnifferHandleTCP(packet, len);
-  } else if (kale::ip::IsUDP(packet, len)) {
+  } else if (packet_ref.IsUDP()) {
     SnifferHandleUDP(packet, len);
   }
 }
@@ -597,7 +659,11 @@ void Proxy::SnifferSendBack(const char *addr, uint16_t port, const char *buf,
 }
 
 void Proxy::SnifferHandleTCP(uint8_t *packet, size_t len) {
-  uint16_t port = ntohs(kale::ip::TCPDstPort(packet, len));
+  kale::ipv4::PacketEditor editor(packet, len);
+  auto tcp_editor = editor.CreateTCPSegmentEditor();
+  assert(tcp_editor);
+  // uint16_t port = ntohs(kale::ip::TCPDstPort(packet, len));
+  uint16_t port = ntohs(tcp_editor->ref().rep->dest_port);
   auto query = tcp_nat_.QueryHost(port);
   if (!query) {
     return;
@@ -612,10 +678,14 @@ void Proxy::SnifferHandleTCP(uint8_t *packet, size_t len) {
   // Modify essential tcp info
   struct sockaddr_in addr =
       *kl::inet::InetSockAddr(subnet_addr.c_str(), subnet_port);
-  kale::ip::ChangeDstAddr(packet, len, addr.sin_addr.s_addr);
-  kale::ip::ChangeTCPDstPort(packet, len, htons(subnet_port));
-  kale::ip::TCPFillChecksum(packet, len);
-  kale::ip::IPFillChecksum(packet, len);
+  // kale::ip::ChangeDstAddr(packet, len, addr.sin_addr.s_addr);
+  editor.ChangeDestAddr(addr.sin_addr.s_addr);
+  // kale::ip::ChangeTCPDstPort(packet, len, htons(subnet_port));
+  tcp_editor->ChangeDestPort(htons(subnet_port));
+  // kale::ip::TCPFillChecksum(packet, len);
+  tcp_editor->FillChecksum();
+  // kale::ip::IPFillChecksum(packet, len);
+  editor.FillChecksum();
   // Sending back to client
   StatIPPacket(packet, len);
   SnifferSendBack(peer_addr.c_str(), peer_port,
@@ -623,22 +693,33 @@ void Proxy::SnifferHandleTCP(uint8_t *packet, size_t len) {
 }
 
 void Proxy::SnifferHandleUDP(uint8_t *packet, size_t len) {
-  uint16_t port = ntohs(kale::ip::UDPDstPort(packet, len));
+  kale::ipv4::PacketEditor editor(packet, len);
+  auto udp_editor = editor.CreateUDPSegmentEditor();
+  assert(udp_editor);
+  // uint16_t port = ntohs(kale::ip::UDPDstPort(packet, len));
+  uint16_t port = ntohs(udp_editor->ref().rep->dest_port);
   auto query = udp_nat_.QueryHost(port);
   if (!query) {
     return;
   }
   auto &host = *query;
+  // peer for sending across inet
   std::string &peer_addr = std::get<0>(host);
   uint16_t peer_port = std::get<1>(host);
+  // subnet for client to send packet to right tun user
   std::string &subnet_addr = std::get<2>(host);
   uint16_t subnet_port = std::get<3>(host);
+  // Modify essential udp info
   struct sockaddr_in addr =
       *kl::inet::InetSockAddr(subnet_addr.c_str(), subnet_port);
-  kale::ip::ChangeDstAddr(packet, len, addr.sin_addr.s_addr);
-  kale::ip::ChangeUDPDstPort(packet, len, htons(subnet_port));
-  kale::ip::UDPFillChecksum(packet, len);
-  kale::ip::IPFillChecksum(packet, len);
+  // kale::ip::ChangeDstAddr(packet, len, addr.sin_addr.s_addr);
+  editor.ChangeDestAddr(addr.sin_addr.s_addr);
+  // kale::ip::ChangeUDPDstPort(packet, len, htons(subnet_port));
+  udp_editor->ChangeDestPort(htons(subnet_port));
+  // kale::ip::UDPFillChecksum(packet, len);
+  udp_editor->FillChecksum();
+  // kale::ip::IPFillChecksum(packet, len);
+  editor.FillChecksum();
   // Sending back to client
   StatIPPacket(packet, len);
   SnifferSendBack(peer_addr.c_str(), peer_port,
